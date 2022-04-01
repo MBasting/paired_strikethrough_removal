@@ -1,0 +1,7 @@
+pandas==1.2.3
+scikit-image==0.18.3
+scikit-learn==1.0.1
+scipy==1.7.2
+torchvision==0.8.2
+torch==1.7.1
+git+https://github.com/npielawski/octopytorch.git@a59e74b809c1a2734903ad6447bfbf591794de2e
