@@ -1,6 +1,7 @@
 # Paired Image to Image Translation for Strikethrough Removal From Handwritten Words
 
-[![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT) [![DOI](https://zenodo.org/badge/471974467.svg)](https://zenodo.org/badge/latestdoi/471974467)
+
 
 ### [Raphaela Heil](mailto:raphaela.heil@it.uu.se):envelope:, [Ekta Vats](ekta.vats@it.uu.se) and [Anders Hast](anders.hast@it.uu.se)
 
