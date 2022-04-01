@@ -97,14 +97,14 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
 
     cmdParser = argparse.ArgumentParser()
-    cmdParser.add_argument("-configfile", required=True, help="path to config file")
+    cmdParser.add_argument("-file", required=True, help="path to config file")
     cmdParser.add_argument("-data", required=True, help="path to data directory")
     cmdParser.add_argument("-save", required=False, help="saves cleaned images if given", default=False,
                            action='store_true')
-    cmdParser.add_argument("-checkpoint", required=False, help="checkpoint file name (incl. '.pth' extension",
+    cmdParser.add_argument("-checkpoint", required=False, help="checkpoint file name (incl. '.pth' extension) - Default: best_fmeasure.pth",
                            default="best_fmeasure.pth")
     args = cmdParser.parse_args()
-    configPath = Path(args.configfile)
+    configPath = Path(args.file)
     dataPath = Path(args.data)
     saveCleanedImages = args.save
     modelName = args.checkpoint
