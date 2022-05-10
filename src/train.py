@@ -2,6 +2,9 @@ import logging
 import time
 from pathlib import Path
 
+import warnings
+warnings.simplefilter("ignore", UserWarning)
+
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
@@ -142,6 +145,7 @@ class TrainRunner:
             self.bestFscore = meanF
 
 
+# Note: To run using IDE, make sure working directory is root folder!
 if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
 

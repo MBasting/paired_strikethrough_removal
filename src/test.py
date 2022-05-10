@@ -3,17 +3,23 @@ Code to test a previously trained neural network regarding its performance of re
 """
 import argparse
 import configparser
+import json
 import logging
 from pathlib import Path
 
+import numpy as np
 import torch
 from PIL import Image
 from torch.utils.data import DataLoader
 
 from src import metrics
-from src.configuration import Configuration, ModelName
+from src.configuration import Configuration, ModelName, DatasetChoice
 from src.dataset import TestDataset
 from src.utils import composeTransformations, PadToSize, initLoggers, getModel
+
+import warnings
+
+warnings.simplefilter("ignore", UserWarning)
 
 INFO_LOGGER_NAME = "st_removal"
 RESULTS_LOGGER_NAME = "results"
@@ -24,7 +30,7 @@ class TestRunner:
     Utility class that wraps the initialisation and testing of a neural network.
     """
 
-    def __init__(self, configuration: Configuration, saveCleanedImages: bool = True,
+    def __init__(self, configuration: Configuration, testImageDir, saveCleanedImages: bool = True,
                  model_name: str = "genStrikeToClean_best_fmeasure.pth"):
         self.logger = logging.getLogger(INFO_LOGGER_NAME)
         self.resultsLogger = logging.getLogger(RESULTS_LOGGER_NAME)
@@ -32,7 +38,7 @@ class TestRunner:
         self.saveCleanedImages = saveCleanedImages
 
         transformations = composeTransformations(self.config)
-        testDataset = TestDataset(self.config.testImageDir, transformations, strokeTypes=["all"])
+        testDataset = TestDataset(testImageDir, transformations, strokeTypes=["all"])
         self.validationDataloader = DataLoader(testDataset, batch_size=4, shuffle=False, num_workers=2, pin_memory=True)
 
         self.model = getModel(self.config)
@@ -58,7 +64,11 @@ class TestRunner:
         else:
             imgDir = self.config.outDir
 
+        rmses = []
+        fmeasures = []
+
         with torch.no_grad():
+
             for datapoints in self.validationDataloader:
                 strokeTypes = datapoints['strokeType']
                 struckImages = datapoints['struck'].to(self.config.device)
@@ -88,26 +98,19 @@ class TestRunner:
                                                       255.0 - cleanedImage * 255.0, binarise=True)[0]
                     else:
                         f1 = metrics.calculateF1Score(groundTruth * 255.0, cleanedImage * 255.0, binarise=True)[0]
-
+                    fmeasures.append(f1)
+                    rmses.append(rmse)
                     self.resultsLogger.info('%f,%f,%s,%s', rmse, f1[0], strokeType, imagePath)
 
+        self.resultsLogger.info('Overall score, %f,%f', np.mean(rmses), np.mean(fmeasures))
 
-if __name__ == "__main__":
 
-    torch.backends.cudnn.benchmark = True
-
-    cmdParser = argparse.ArgumentParser()
-    cmdParser.add_argument("-file", required=True, help="path to config file")
-    cmdParser.add_argument("-data", required=True, help="path to data directory")
-    cmdParser.add_argument("-save", required=False, help="saves cleaned images if given", default=False,
-                           action='store_true')
-    cmdParser.add_argument("-checkpoint", required=False, help="checkpoint file name (incl. '.pth' extension) - Default: best_fmeasure.pth",
-                           default="best_fmeasure.pth")
-    args = cmdParser.parse_args()
-    configPath = Path(args.file)
-    dataPath = Path(args.data)
-    saveCleanedImages = args.save
-    modelName = args.checkpoint
+def evaluate_one_file(file, data, save, checkpoint):
+    configPath = Path(file)
+    if args.data is not None:
+        dataPath = Path(data)
+    saveCleanedImages = save
+    modelName = checkpoint
 
     configParser = configparser.ConfigParser()
     configParser.read(configPath)
@@ -123,15 +126,63 @@ if __name__ == "__main__":
 
     parsedConfig = configParser[section]
     conf = Configuration(parsedConfig, test=True, fileSection=section)
-    conf.testImageDir = dataPath
+    if args.data is not None:
+        testImageDirs = [dataPath]
+    else:
+        testImageDirs = [Path(conf.dataset_dir + "/" + ds_choice.name + "/test") for ds_choice in DatasetChoice if
+                         ds_choice.name != "Dracula_synth"]
+    results = {}
+    for testImageDir in testImageDirs:
+        conf.testImageDir = testImageDir
+        out = configPath.parent / "{}_{}".format(testImageDir.parent.name, testImageDir.name)
+        out.mkdir(exist_ok=True)
+        conf.outDir = out
+        results[testImageDir.parent.name] = conf.outDir.name + "/results.log"
+        initLoggers(conf, INFO_LOGGER_NAME, [RESULTS_LOGGER_NAME])
+        logger = logging.getLogger(INFO_LOGGER_NAME)
+        logger.info(conf.outDir)
+        runner = TestRunner(conf, testImageDir, saveCleanedImages=saveCleanedImages, model_name=modelName)
+        runner.test()
+    return results
 
-    out = configPath.parent / "{}_{}".format(dataPath.parent.name, dataPath.name)
-    out.mkdir(exist_ok=True)
-    conf.outDir = out
 
-    initLoggers(conf, INFO_LOGGER_NAME, [RESULTS_LOGGER_NAME])
-    logger = logging.getLogger(INFO_LOGGER_NAME)
-    logger.info(conf.outDir)
+def evaluate_folder(folder, data, save, checkpoint):
+    results = {}
+    for child in folder.iterdir():
+        if child.is_dir():
+            file = folder.name + "/" + child.name + "/config.cfg"
+            results_files = evaluate_one_file(file, data, save, checkpoint)
+            results[child.name] = {}
+            temp = {}
+            for res_name, res_file in results_files.items():
+                with open(f"{folder.name}/{child.name}/{res_file}") as f:
+                    f = f.readlines()
+                temp[res_name] = f
+            results[child.name] = temp
+    with open('results.json', 'w') as fp:
+        json.dump(results, fp)
 
-    runner = TestRunner(conf, saveCleanedImages=saveCleanedImages, model_name=modelName)
-    runner.test()
+
+if __name__ == "__main__":
+    torch.backends.cudnn.benchmark = True
+
+    cmdParser = argparse.ArgumentParser()
+    cmdParser.add_argument("-file", required=False, help="path to config file", default=None)
+    cmdParser.add_argument("-folder", required=False, help="path to folder containing the training files", default=None)
+    cmdParser.add_argument("-data", required=False,
+                           help="path to data directory, if no path given all test dataset are run", default=None)
+    cmdParser.add_argument("-save", required=False, help="saves cleaned images if given", default=False,
+                           action='store_true')
+    cmdParser.add_argument("-checkpoint", required=False,
+                           help="checkpoint file name (incl. '.pth' extension) - Default: best_fmeasure.pth",
+                           default="best_fmeasure.pth")
+    args = cmdParser.parse_args()
+    if args.file is None and args.folder is None:
+        print("No file or Folder specified")
+        exit()
+    if args.folder is not None:
+        folder = args.folder
+        print("okay?")
+        evaluate_folder(Path(folder), args.data, args.save, args.checkpoint)
+    else:
+        evaluate_one_file(args.file, args.data, args.save, args.checkpoint)

@@ -1,11 +1,11 @@
-# Paired Image to Image Translation for Strikethrough Removal From Handwritten Words
+# Paired Image to Image Translation for Strikethrough Removal From Handwritten Words Further Work
+This project was done by Alexander, Sven and Mark for the Computer Vision for Deep Learning course
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT) [![DOI](https://zenodo.org/badge/471974467.svg)](https://zenodo.org/badge/latestdoi/471974467)
 
 
-### [Raphaela Heil](mailto:raphaela.heil@it.uu.se):envelope:, [Ekta Vats](ekta.vats@it.uu.se) and [Anders Hast](anders.hast@it.uu.se)
+### Original Authors: [Raphaela Heil](mailto:raphaela.heil@it.uu.se):envelope:, [Ekta Vats](ekta.vats@it.uu.se) and [Anders Hast](anders.hast@it.uu.se)
 
-Code for the [DAS 2022](https://das2022.univ-lr.fr/) paper **"Paired Image to Image Translation for Strikethrough Removal From Handwritten Words"**
 
 ## Table of Contents
 1. [Code](#code)
@@ -22,6 +22,7 @@ Code for the [DAS 2022](https://das2022.univ-lr.fr/) paper **"Paired Image to Im
 ```bash
 python -m src.train -file <path to config file> -section <section name>
 ```
+By default, the path to the config file will be to `config.cfg` and the standard section will be `DEFAULT`.
 
 
 ### 1.2 Test
@@ -49,6 +50,41 @@ If you want to use a checkpoint with a different name than `best_fmeasure.pth` a
     - based on the train split of Dracula<sub>real</sub>
     - five partitions with different strikethrough strokes applied to each word
 
+The standard folderstructure that is already configured is:
+```├── datasets
+│   ├── Dracula_real
+│   │   ├── test
+│   │   │   ├── struck
+│   │   │   └── struck_gt
+│   │   ├── train
+│   │   │   ├── clean
+│   │   │   ├── struck
+│   │   │   └── struck_gt
+│   │   └── validation
+│   │       ├── struck
+│   │       └── struck_gt
+│   ├── Dracula_synth
+│   │   └── train
+│   │       ├── fold_0
+│   │       ├── fold_1
+│   │       ├── fold_2
+│   │       ├── fold_3
+│   │       └── fold_4
+│   ├── IAMsynth_full
+│   │   ├── test
+│   │   │   ├── clean
+│   │   │   ├── struck
+│   │   │   └── struck_gt
+│   │   ├── train
+│   │   │   ├── clean
+│   │   │   ├── struck
+│   │   │   └── struck_gt
+│   │   └── validation
+│   │       ├── clean
+│   │       ├── struck
+│   │       └── struck_gt
+```
+This folder-structure can easily be followed by downloading the datasets linked above, configuring them if necessary and copying them in a folder called `datasets`. 
 
 ## 3 Citation
 [DAS 2022](https://das2022.univ-lr.fr/)
@@ -61,6 +97,16 @@ If you want to use a checkpoint with a different name than `best_fmeasure.pth` a
   year={2022},
   pubstate={to appear}}
 ```
+ICDAR 2021
+
+```
+@INPROCEEDINGS{heil2021strikethrough,
+  author={Heil, Raphaela and Vats, Ekta and Hast, Anders},
+  booktitle={2021 International Conference on Document Analysis and Recognition (ICDAR)},
+  title={{Strikethrough Removal from Handwritten Words Using CycleGANs}},
+  year={2021},
+  pubstate={to appear}}
+```
 
 ## 4 Acknowledgements 
-The computations were enabled by resources provided by the Swedish National Infrastructure for Computing (SNIC) at Chalmers Centre for Computational Science and Engineering (C3SE) partially funded by the Swedish Research Council through grant agreement no. 2018-05973. This work is partially supported by Riksbankens Jubileumsfond (RJ) (Dnr P19-0103:1).
+This work is a continuation on the work done by the above authors and much credits goes to their work and original codebase which can be found [here](https://github.com/RaphaelaHeil/paired_strikethrough_removal). The CycleGAN code also mentioned in the paper during evaluation can also be found in this repository, which original can be found [here](https://github.com/RaphaelaHeil/strikethrough-removal-cyclegans/tree/main) 

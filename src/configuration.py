@@ -66,6 +66,19 @@ class ModelName(Enum):
             return ModelName.DENSE
 
 
+class DatasetChoice(Enum):
+    IAMsynth_full = auto()
+    Dracula_real = auto()
+    Dracula_synth = auto()
+
+    @staticmethod
+    def getByName(name: str) -> str:
+        if name in [ds_choice.name for ds_choice in DatasetChoice]:
+            return DatasetChoice[name]
+        else:
+            return DatasetChoice.IAMsynth_full
+
+
 class Configuration:
     """
     Holds the configuration for the current experiment.
@@ -74,12 +87,15 @@ class Configuration:
     def __init__(self, parsedConfig: SectionProxy, test: bool = False, fileSection: str = "DEFAULT"):
         self.parsedConfig = parsedConfig
         self.fileSection = fileSection
+        self.train_dataset_choice = DatasetChoice.getByName(self.getSetStr("dataset_choice_train", "IAMsynth_full"))
+        self.test_dataset_choice = DatasetChoice.getByName(self.getSetStr("dataset_choice_test", "IAMsynth_full"))
 
         if not test:
-            self.outDir = Path(self.parsedConfig.get('out_dir')) / '{}_{}_{}_{}'.format(self.parsedConfig.get("model"),
+            self.outDir = Path(self.parsedConfig.get('out_dir')) / '{}_{}_{}_{}_{}'.format(self.getSetStr("model", "DENSE"),
                                                                                         fileSection,
                                                                                         str(int(time.time())),
-                                                                                        random.randint(0, 100000))
+                                                                                        random.randint(0, 100000),
+                                                                                        self.train_dataset_choice.name)
             self.parsedConfig['out_dir'] = str(self.outDir)
 
         if not test and not self.outDir.exists():
@@ -99,8 +115,12 @@ class Configuration:
         self.imageWidth = self.getSetInt('image_width', 256)
         self.modelSaveEpoch = self.getSetInt('model_save_epoch', 10)
         self.validationEpoch = self.getSetInt('validation_epoch', 10)
-        self.trainImageDir = Path(self.getSetStr('train_image_dir'))
-        self.testImageDir = Path(self.getSetStr('test_image_dir'))
+        self.dataset_dir = self.getSetStr('dataset_dir', "datasets")
+        full_dataset_path = self.dataset_dir + "/"
+        self.trainImageDir = Path(
+            full_dataset_path + self.train_dataset_choice.name)
+        self.testImageDir = Path(
+            full_dataset_path + self.test_dataset_choice.name + "/test")
         self.invertImages = self.getSetBoolean('invert_images', False)
         self.greyscale = self.getSetBoolean('greyscale', False)
         self.blockCount = self.getSetInt('block_count', 1)
@@ -126,11 +146,13 @@ class Configuration:
         self.up = self.parseTiramisuConfig(self.getSetStr("up", "4"))
 
         f = parsedConfig.get("fold")
-        if f == "all":
+        if f == "all" and self.train_dataset_choice == DatasetChoice.Dracula_synth:
             self.fold = f
             self.parsedConfig["fold"] = "all"
         else:
             self.fold = self.getSetInt("fold", -1)
+            if self.fold != -1 and self.train_dataset_choice != DatasetChoice.Dracula_synth:
+                self.fold = -1
 
         self.modelName = ModelName.getByName(self.getSetStr("model", "DENSE"))
 
