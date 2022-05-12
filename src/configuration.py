@@ -257,7 +257,7 @@ def getConfiguration() -> Configuration:
     cmdParser.add_argument("-file", required=False, help="path to config-file")
     args = cmdParser.parse_args()
     fileSection = 'DEFAULT'
-    fileName = 'config.cfg'
+    fileName = 'config_files/config.cfg'
     if args.section:
         fileSection = args.section
 

@@ -19,11 +19,17 @@ This project was done by Alexander, Sven and Mark for the Computer Vision for De
 ## 1 Code
 
 ### 1.1 Train
+For all models except the CycleGAN run
 ```bash
 python -m src.train -file <path to config file> -section <section name>
 ```
-By default, the path to the config file will be to `config.cfg` and the standard section will be `DEFAULT`.
+By default, the path to the config file will be to `config_files/config.cfg` and the standard section will be `DEFAULT`.
 
+For CycleGAN:
+```bash
+python -m src.cycle_gan.train -configfile <path to config file> -config <section name>
+```
+The config file used to train CycleGAN is `serverConfig_strike_rem.cfg`. 
 
 ### 1.2 Test
 ```bash
