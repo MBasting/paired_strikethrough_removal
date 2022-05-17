@@ -42,7 +42,7 @@ class TrainRunner:
         trainDataset = PairedDataset(config.trainImageDir, fold=self.config.fold, mode="train",
                                      transforms=self.transformations, strokeTypes=self.config.trainStrokeTypes)
         self.trainDataloader = DataLoader(trainDataset, batch_size=self.config.batchSize, shuffle=True, num_workers=1)
-        testDataset = PairedDataset(config.trainImageDir, fold=self.config.fold, mode="validation",
+        testDataset = PairedDataset(config.testImageDir, fold=-1, mode="validation",
                                     transforms=self.transformations, strokeTypes=self.config.testStrokeTypes)
         self.testDataloader = DataLoader(testDataset, batch_size=self.config.batchSize, shuffle=False, num_workers=1)
 
@@ -149,14 +149,14 @@ class TrainRunner:
 
 def train_all_models():
     # For any other change in configuration add a loop and change of arguments!
-    training_datasets = [dataset.name for dataset in DatasetChoice]
+    training_datasets = [dataset.name for dataset in DatasetChoice if dataset is not DatasetChoice.Dracula_synth]
     model_configs = [section.name for section in FileSection]
     min_time = int(time.time())
     for section in model_configs:
         for dataset in training_datasets:
             train_dataset_choice = dataset
             test_dataset_choice = dataset
-            if dataset is DatasetChoice.Dracula_synth.name:
+            if test_dataset_choice is DatasetChoice.Dracula_synth.name:
                 test_dataset_choice = DatasetChoice.Dracula_real.name
             conf = getConfiguration_dynamic(None, section, train_dataset=train_dataset_choice,
                                             test_dataset=test_dataset_choice)
@@ -188,7 +188,7 @@ def train_and_evaluate_all_models(folder):
 # Note: To run using IDE, make sure working directory is root folder!
 if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
-    train_all_models()
+    train_and_evaluate_all_models("tmp")
     # initLoggers(conf, 'str_ae', ['reconstructionLoss', 'val'])
     # logging.getLogger("str_ae").info(conf.fileSection)
     # runner = TrainRunner(conf)

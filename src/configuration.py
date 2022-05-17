@@ -151,7 +151,7 @@ class Configuration:
         self.trainImageDir = Path(
             full_dataset_path + self.train_dataset_choice)
         self.testImageDir = Path(
-            full_dataset_path + self.test_dataset_choice + "/test")
+            full_dataset_path + self.test_dataset_choice)
         self.invertImages = self.getSetBoolean('invert_images', False)
         self.greyscale = self.getSetBoolean('greyscale', False)
         self.blockCount = self.getSetInt('block_count', 1)
