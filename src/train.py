@@ -3,6 +3,10 @@ import time
 from pathlib import Path
 
 import warnings
+import random
+
+from src.test import evaluate_folder
+
 warnings.simplefilter("ignore", UserWarning)
 
 import numpy as np
@@ -11,7 +15,7 @@ from torch.utils.data import DataLoader
 from torchvision.utils import save_image
 
 from src import configuration, metrics
-from src.configuration import ModelName, getConfiguration
+from src.configuration import ModelName, getConfiguration, DatasetChoice, FileSection, getConfiguration_dynamic
 from src.dataset import PairedDataset
 from src.utils import initLoggers, composeTransformations, PadToSize, getModel
 
@@ -25,8 +29,6 @@ class TrainRunner:
 
         self.config = config
         self.model = getModel(self.config)
-
-        self.baseLogger.info(self.config.modelName)
 
         self.model = self.model.to(config.device)
         if self.config.loss == "mse":
@@ -145,13 +147,49 @@ class TrainRunner:
             self.bestFscore = meanF
 
 
+def train_all_models():
+    # For any other change in configuration add a loop and change of arguments!
+    training_datasets = [dataset.name for dataset in DatasetChoice]
+    model_configs = [section.name for section in FileSection]
+    min_time = int(time.time())
+    for section in model_configs:
+        for dataset in training_datasets:
+            train_dataset_choice = dataset
+            test_dataset_choice = dataset
+            if dataset is DatasetChoice.Dracula_synth.name:
+                test_dataset_choice = DatasetChoice.Dracula_real.name
+            conf = getConfiguration_dynamic(None, section, train_dataset=train_dataset_choice,
+                                            test_dataset=test_dataset_choice)
+            initLoggers(conf, 'str_ae', ['reconstructionLoss', 'val'])
+            logging.getLogger("str_ae").info(conf.fileSection)
+            logging.getLogger("str_ae").info(conf.train_dataset_choice)
+            logging.getLogger("str_ae").info(conf.test_dataset_choice)
+            runner = TrainRunner(conf)
+            runner.run()
+    return min_time
+
+
+def train_and_evaluate_all_models(folder):
+    """
+    Train all configuration of datasets and models and afterwards test all of them
+    Parameters
+    ----------
+    folder : str
+        path to folder containing the training files
+
+    Returns
+    -------
+
+    """
+    min_time = train_all_models()
+    evaluate_folder(folder, None, False, False, min_time)
+
+
 # Note: To run using IDE, make sure working directory is root folder!
 if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
-
-    conf = getConfiguration()
-
-    initLoggers(conf, 'str_ae', ['reconstructionLoss', 'val'])
-    logging.getLogger("str_ae").info(conf.fileSection)
-    runner = TrainRunner(conf)
-    runner.run()
+    train_all_models()
+    # initLoggers(conf, 'str_ae', ['reconstructionLoss', 'val'])
+    # logging.getLogger("str_ae").info(conf.fileSection)
+    # runner = TrainRunner(conf)
+    # runner.run()

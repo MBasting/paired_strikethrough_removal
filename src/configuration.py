@@ -66,6 +66,37 @@ class ModelName(Enum):
             return ModelName.DENSE
 
 
+class FileSection(Enum):
+    """
+    Encodes the names of supported sections
+    """
+    DEFAULT = auto()
+    SIMPLE_CNN = auto()
+    SHALLOW = auto()
+    UNET = auto()
+    GENERATOR = auto()
+
+    @staticmethod
+    def getByName(name: str) -> "FileSection":
+        """
+        Returns the FileSection corresponding to the given string. Returns FileSection.RESNET in case an unknown name is
+        provided.
+
+        Parameters
+        ----------
+        name : str
+            string representation that should be converted to a FileSection
+
+        Returns
+        -------
+            FileSection representation of the provided string, default: FileSection.DEFAULT
+        """
+        if name.upper() in [section.name for section in FileSection]:
+            return FileSection[name.upper()]
+        else:
+            return FileSection.DEFAULT
+
+
 class DatasetChoice(Enum):
     IAMsynth_full = auto()
     Dracula_real = auto()
@@ -84,18 +115,18 @@ class Configuration:
     Holds the configuration for the current experiment.
     """
 
-    def __init__(self, parsedConfig: SectionProxy, test: bool = False, fileSection: str = "DEFAULT"):
+    def __init__(self, parsedConfig: SectionProxy, test: bool = False, fileSection: str = "DEFAULT", train_dataset: str = "IAMsynth_full", test_dataset: str = "IAMsynth_full"):
         self.parsedConfig = parsedConfig
-        self.fileSection = fileSection
-        self.train_dataset_choice = DatasetChoice.getByName(self.getSetStr("dataset_choice_train", "IAMsynth_full"))
-        self.test_dataset_choice = DatasetChoice.getByName(self.getSetStr("dataset_choice_test", "IAMsynth_full"))
-
+        self.fileSection = FileSection.getByName(fileSection).name
+        self.train_dataset_choice = train_dataset
+        self.test_dataset_choice = test_dataset
         if not test:
-            self.outDir = Path(self.parsedConfig.get('out_dir')) / '{}_{}_{}_{}_{}'.format(self.getSetStr("model", "DENSE"),
-                                                                                        fileSection,
-                                                                                        str(int(time.time())),
-                                                                                        random.randint(0, 100000),
-                                                                                        self.train_dataset_choice.name)
+            self.outDir = Path(self.parsedConfig.get('out_dir')) / '{}_{}_{}_{}_{}'.format(
+                self.getSetStr("model", "DENSE"),
+                fileSection,
+                str(int(time.time())),
+                random.randint(0, 100000),
+                self.train_dataset_choice)
             self.parsedConfig['out_dir'] = str(self.outDir)
 
         if not test and not self.outDir.exists():
@@ -118,9 +149,9 @@ class Configuration:
         self.dataset_dir = self.getSetStr('dataset_dir', "datasets")
         full_dataset_path = self.dataset_dir + "/"
         self.trainImageDir = Path(
-            full_dataset_path + self.train_dataset_choice.name)
+            full_dataset_path + self.train_dataset_choice)
         self.testImageDir = Path(
-            full_dataset_path + self.test_dataset_choice.name + "/test")
+            full_dataset_path + self.test_dataset_choice + "/test")
         self.invertImages = self.getSetBoolean('invert_images', False)
         self.greyscale = self.getSetBoolean('greyscale', False)
         self.blockCount = self.getSetInt('block_count', 1)
@@ -146,12 +177,12 @@ class Configuration:
         self.up = self.parseTiramisuConfig(self.getSetStr("up", "4"))
 
         f = parsedConfig.get("fold")
-        if f == "all" and self.train_dataset_choice == DatasetChoice.Dracula_synth:
+        if f == "all" and self.train_dataset_choice == DatasetChoice.Dracula_synth.name:
             self.fold = f
             self.parsedConfig["fold"] = "all"
         else:
             self.fold = self.getSetInt("fold", -1)
-            if self.fold != -1 and self.train_dataset_choice != DatasetChoice.Dracula_synth:
+            if self.fold != -1 and self.train_dataset_choice != DatasetChoice.Dracula_synth.name:
                 self.fold = -1
 
         self.modelName = ModelName.getByName(self.getSetStr("model", "DENSE"))
@@ -244,6 +275,32 @@ class Configuration:
         return strokeTypes
 
 
+def getConfiguration_dynamic(file=None, section=None, train_dataset=None, test_dataset=None) -> Configuration:
+    """
+
+    Returns
+    -------
+        parsed :class:`Configuration`
+    """
+    fileSection = 'DEFAULT'
+    fileName = 'config_files/config.cfg'
+    if section:
+        fileSection = section
+    if file:
+        fileName = file
+    configParser = configparser.ConfigParser()
+    configParser.read(fileName)
+    parsedConfig = configParser[fileSection]
+    sections = configParser.sections()
+    for s in sections:
+        if s != fileSection:
+            configParser.remove_section(s)
+    if train_dataset is not None and test_dataset is not None:
+        return Configuration(parsedConfig, fileSection=fileSection, train_dataset=train_dataset, test_dataset=test_dataset)
+    else:
+        return Configuration(parsedConfig, fileSection=fileSection)
+
+
 def getConfiguration() -> Configuration:
     """
     Reads the required arguments from command line and parse the respective configuration file/section.
@@ -256,18 +313,4 @@ def getConfiguration() -> Configuration:
     cmdParser.add_argument("-section", required=False, help="section of config-file to use")
     cmdParser.add_argument("-file", required=False, help="path to config-file")
     args = cmdParser.parse_args()
-    fileSection = 'DEFAULT'
-    fileName = 'config_files/config.cfg'
-    if args.section:
-        fileSection = args.section
-
-    if args.file:
-        fileName = args.file
-    configParser = configparser.ConfigParser()
-    configParser.read(fileName)
-    parsedConfig = configParser[fileSection]
-    sections = configParser.sections()
-    for s in sections:
-        if s != fileSection:
-            configParser.remove_section(s)
-    return Configuration(parsedConfig, fileSection=fileSection)
+    return getConfiguration_dynamic(args.file, args.section)

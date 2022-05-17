@@ -102,12 +102,12 @@ class TestRunner:
                     rmses.append(rmse)
                     self.resultsLogger.info('%f,%f,%s,%s', rmse, f1[0], strokeType, imagePath)
 
-        self.resultsLogger.info('Overall score, %f,%f', np.mean(rmses), np.mean(fmeasures))
+        self.resultsLogger.info('%f,%f', np.mean(rmses), np.mean(fmeasures))
 
 
 def evaluate_one_file(file, data, save, checkpoint):
     configPath = Path(file)
-    if args.data is not None:
+    if data is not None:
         dataPath = Path(data)
     saveCleanedImages = save
     modelName = checkpoint
@@ -116,7 +116,6 @@ def evaluate_one_file(file, data, save, checkpoint):
     configParser.read(configPath)
 
     section = "DEFAULT"
-
     sections = configParser.sections()
     if len(sections) == 1:
         section = sections[0]
@@ -126,7 +125,7 @@ def evaluate_one_file(file, data, save, checkpoint):
 
     parsedConfig = configParser[section]
     conf = Configuration(parsedConfig, test=True, fileSection=section)
-    if args.data is not None:
+    if data is not None:
         testImageDirs = [dataPath]
     else:
         testImageDirs = [Path(conf.dataset_dir + "/" + ds_choice.name + "/test") for ds_choice in DatasetChoice if
@@ -146,19 +145,21 @@ def evaluate_one_file(file, data, save, checkpoint):
     return results
 
 
-def evaluate_folder(folder, data, save, checkpoint):
+def evaluate_folder(folder, data, save, checkpoint, min_time=None):
     results = {}
     for child in folder.iterdir():
         if child.is_dir():
-            file = folder.name + "/" + child.name + "/config.cfg"
-            results_files = evaluate_one_file(file, data, save, checkpoint)
-            results[child.name] = {}
-            temp = {}
-            for res_name, res_file in results_files.items():
-                with open(f"{folder.name}/{child.name}/{res_file}") as f:
-                    f = f.readlines()
-                temp[res_name] = f
-            results[child.name] = temp
+            if min_time is None or int(child.split("_")[2]) > min_time:
+                file = folder.name + "/" + child.name + "/config.cfg"
+                results_files = evaluate_one_file(file, data, save, checkpoint)
+                results[child.name] = {}
+                temp = {}
+                for res_name, res_file in results_files.items():
+                    with open(f"{folder.name}/{child.name}/{res_file}") as f:
+                        f = f.readlines()[-1]
+                    mean_result = f.split(",")
+                    temp[res_name] = {"RMSE": mean_result[0], "F1" : mean_result[1]}
+                results[child.name] = temp
     with open('results.json', 'w') as fp:
         json.dump(results, fp)
 
