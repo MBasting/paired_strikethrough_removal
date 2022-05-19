@@ -149,16 +149,27 @@ def evaluate_folder(folder, data, save, checkpoint, min_time=None):
     results = {}
     for child in folder.iterdir():
         if child.is_dir():
-            if min_time is None or int(child.split("_")[2]) > min_time:
+            if min_time is None or int(child.name.split("_")[-3]) > min_time:
                 file = folder.name + "/" + child.name + "/config.cfg"
                 results_files = evaluate_one_file(file, data, save, checkpoint)
                 results[child.name] = {}
                 temp = {}
                 for res_name, res_file in results_files.items():
                     with open(f"{folder.name}/{child.name}/{res_file}") as f:
-                        f = f.readlines()[-1]
-                    mean_result = f.split(",")
-                    temp[res_name] = {"RMSE": mean_result[0], "F1" : mean_result[1]}
+                        f = f.readlines()
+                    f = f[1:]
+                    stroke_type_rmse= {}
+                    stroke_type_f1 = {}
+                    for lines in f:
+                        split = lines.split(",")
+                        if len(split) == 2:
+                            stroke_type_rmse["all"] = split[0]
+                            stroke_type_f1["all"] = split[1]
+                            continue
+                        stroke_type_rmse[split[2]] = split[0]
+                        stroke_type_f1[split[2]] = split[1]
+                temp["RMSE"] = stroke_type_rmse
+                temp["F1"] = stroke_type_f1
                 results[child.name] = temp
     with open('results.json', 'w') as fp:
         json.dump(results, fp)
