@@ -5,6 +5,7 @@ import argparse
 import configparser
 import json
 import logging
+import time
 from pathlib import Path
 
 import numpy as np
@@ -31,7 +32,7 @@ class TestRunner:
     """
 
     def __init__(self, configuration: Configuration, testImageDir, saveCleanedImages: bool = True,
-                 model_name: str = "genStrikeToClean_best_fmeasure.pth"):
+                 model_name: str = "best_fmeasure.pth"):
         self.logger = logging.getLogger(INFO_LOGGER_NAME)
         self.resultsLogger = logging.getLogger(RESULTS_LOGGER_NAME)
         self.config = configuration
@@ -140,7 +141,7 @@ def evaluate_one_file(file, data, save, checkpoint):
         initLoggers(conf, INFO_LOGGER_NAME, [RESULTS_LOGGER_NAME])
         logger = logging.getLogger(INFO_LOGGER_NAME)
         logger.info(conf.outDir)
-        runner = TestRunner(conf, testImageDir, saveCleanedImages=saveCleanedImages, model_name=modelName)
+        runner = TestRunner(conf, testImageDir, saveCleanedImages=saveCleanedImages)
         runner.test()
     return results
 
@@ -160,7 +161,7 @@ def evaluate_folder(folder, data, save, checkpoint, min_time=None):
                     mean_result = f.split(",")
                     temp[res_name] = {"RMSE": mean_result[0], "F1" : mean_result[1]}
                 results[child.name] = temp
-    with open('results.json', 'w') as fp:
+    with open(f'results_{str(time.time())}.json', 'w') as fp:
         json.dump(results, fp)
 
 

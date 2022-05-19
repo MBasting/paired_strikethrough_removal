@@ -188,7 +188,7 @@ def train_and_evaluate_all_models(folder):
 # Note: To run using IDE, make sure working directory is root folder!
 if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
-    train_and_evaluate_all_models("tmp")
+    train_and_evaluate_all_models(Path('tmp'))
     # initLoggers(conf, 'str_ae', ['reconstructionLoss', 'val'])
     # logging.getLogger("str_ae").info(conf.fileSection)
     # runner = TrainRunner(conf)
