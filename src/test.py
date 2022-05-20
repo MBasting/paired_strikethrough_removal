@@ -161,14 +161,27 @@ def evaluate_folder(folder, data, save, checkpoint, min_time=None):
                     f = f[1:]
                     stroke_type_rmse= {}
                     stroke_type_f1 = {}
+                    stroke_counts = {}
                     for lines in f:
                         split = lines.split(",")
                         if len(split) == 2:
+                            for key, value in stroke_type_rmse.items():
+                                stroke_type_rmse[key] /= stroke_counts[key]
+                                stroke_type_f1[key] /= stroke_counts[key]
                             stroke_type_rmse["all"] = split[0]
                             stroke_type_f1["all"] = split[1]
+
                             continue
-                        stroke_type_rmse[split[2]] = split[0]
-                        stroke_type_f1[split[2]] = split[1]
+                        if stroke_type_rmse.__contains__(split[2]):
+                            stroke_type_rmse[split[2]] += float(split[0])
+                            stroke_type_f1[split[2]] += float(split[1])
+                            stroke_counts[split[2]] += 1
+                        else:
+                            stroke_type_rmse[split[2]] = float(split[0])
+                            stroke_type_f1[split[2]] = float(split[1])
+                            stroke_counts[split[2]] = 1
+
+
                 temp["RMSE"] = stroke_type_rmse
                 temp["F1"] = stroke_type_f1
                 results[child.name] = temp
