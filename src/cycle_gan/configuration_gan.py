@@ -128,7 +128,7 @@ class ModelName(Enum):
             return ModelName.RESNET
 
 
-class Configuration:
+class ConfigurationGAN:
     """
     Holds the configuration for the current experiment.
     """
@@ -255,7 +255,24 @@ class Configuration:
         return strokeTypes
 
 
-def getConfiguration() -> Configuration:
+def getDynamicConfigurationGAN(configSection, configFile) -> ConfigurationGAN:
+    fileSection = 'ORIGINAL'
+    fileName = 'config_files/serverConfig_strike_rem2.cfg'
+    if configSection:
+        fileSection = configSection
+    if configFile:
+        fileName = configFile
+    configParser = configparser.ConfigParser()
+    configParser.read(fileName)
+    parsedConfig = configParser[fileSection]
+    sections = configParser.sections()
+    for s in sections:
+        if s != fileSection:
+            configParser.remove_section(s)
+    return ConfigurationGAN(parsedConfig, fileSection=fileSection)
+
+
+def getConfigurationGAN() -> ConfigurationGAN:
     """
     Reads the required arguments from command line and parse the respective configuration file/section.
 
@@ -267,18 +284,4 @@ def getConfiguration() -> Configuration:
     cmdParser.add_argument("-config", required=False, help="section of config-file to use")
     cmdParser.add_argument("-configfile", required=False, help="path to config-file")
     args = vars(cmdParser.parse_args())
-    fileSection = 'DEFAULT'
-    fileName = 'config.cfg'
-    if args["config"]:
-        fileSection = args["config"]
-
-    if args['configfile']:
-        fileName = args['configfile']
-    configParser = configparser.ConfigParser()
-    configParser.read(fileName)
-    parsedConfig = configParser[fileSection]
-    sections = configParser.sections()
-    for s in sections:
-        if s != fileSection:
-            configParser.remove_section(s)
-    return Configuration(parsedConfig, fileSection=fileSection)
+    return getDynamicConfigurationGAN(args["config"], args['configfile'])

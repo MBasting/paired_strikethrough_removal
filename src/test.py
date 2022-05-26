@@ -15,6 +15,8 @@ from torch.utils.data import DataLoader
 
 from src import metrics
 from src.configuration import Configuration, ModelName, DatasetChoice
+from src.cycle_gan import ConfigurationGAN
+from src.cycle_gan.test_gan import TestRunnerGAN
 from src.dataset import TestDataset
 from src.utils import composeTransformations, PadToSize, initLoggers, getModel
 
@@ -106,7 +108,7 @@ class TestRunner:
         self.resultsLogger.info('%f,%f', np.mean(rmses), np.mean(fmeasures))
 
 
-def evaluate_one_file(file, data, save, checkpoint):
+def evaluate_one_file(file, data, save, checkpoint, GAN=False):
     configPath = Path(file)
     if data is not None:
         dataPath = Path(data)
@@ -123,14 +125,20 @@ def evaluate_one_file(file, data, save, checkpoint):
     else:
         logging.getLogger("st_recognition").warning("Found %s than one named sections in config file. Using 'DEFAULT' "
                                                     "as fallback.", 'more' if len(sections) > 1 else 'fewer')
-
+    print(file)
     parsedConfig = configParser[section]
-    conf = Configuration(parsedConfig, test=True, fileSection=section)
+    if not GAN:
+        conf = Configuration(parsedConfig, test=True, fileSection=section)
+        dataset_dir = conf.dataset_dir
+    else:
+        conf = ConfigurationGAN(parsedConfig, test=True, fileSection=section)
+        dataset_dir = "datasets"
+
     if data is not None:
         testImageDirs = [dataPath]
     else:
-        testImageDirs = [Path(conf.dataset_dir + "/" + ds_choice.name + "/test") for ds_choice in DatasetChoice if
-                         ds_choice.name != "Dracula_synth"]
+        testImageDirs = [Path(dataset_dir + "/" + ds_choice.name + "/test") for ds_choice in DatasetChoice if
+                             ds_choice.name != "Dracula_synth"]
     results = {}
     for testImageDir in testImageDirs:
         conf.testImageDir = testImageDir
@@ -141,8 +149,12 @@ def evaluate_one_file(file, data, save, checkpoint):
         initLoggers(conf, INFO_LOGGER_NAME, [RESULTS_LOGGER_NAME])
         logger = logging.getLogger(INFO_LOGGER_NAME)
         logger.info(conf.outDir)
-        runner = TestRunner(conf, testImageDir, saveCleanedImages=saveCleanedImages)
-        runner.test()
+        if GAN:
+            runner = TestRunnerGAN(conf, testImageDir, saveCleanedImages=saveCleanedImages)
+            runner.test()
+        else:
+            runner = TestRunner(conf, testImageDir, saveCleanedImages=saveCleanedImages)
+            runner.test()
     return results
 
 
@@ -150,43 +162,66 @@ def evaluate_folder(folder, data, save, checkpoint, min_time=None):
     results = {}
     for child in folder.iterdir():
         if child.is_dir():
-            if min_time is None or int(child.name.split("_")[-3]) > min_time:
+            # Found folder that contains CycleGAN results
+            if len(child.name.split("_")) < 2:
+                for grand_child in child.iterdir():
+                    file = folder.name + "/" + child.name + "/" + grand_child.name + "/config.cfg"
+                    results_files = evaluate_one_file(file, data, save, checkpoint, True)
+                    temp = read_to_dict(results_files, path=folder.name + "/" + child.name + "/" + grand_child.name)
+                    results[grand_child.name] = temp
+
+            elif min_time is None or int(child.name.split("_")[-3]) > min_time:
                 file = folder.name + "/" + child.name + "/config.cfg"
                 results_files = evaluate_one_file(file, data, save, checkpoint)
-                results[child.name] = {}
-                temp = {}
-                for res_name, res_file in results_files.items():
-                    with open(f"{folder.name}/{child.name}/{res_file}") as f:
-                        f = f.readlines()
-                    f = f[1:]
-                    stroke_type_rmse= {}
-                    stroke_type_f1 = {}
-                    stroke_counts = {}
-                    for lines in f:
-                        split = lines.split(",")
-                        if len(split) == 2:
-                            for key, value in stroke_type_rmse.items():
-                                stroke_type_rmse[key] /= stroke_counts[key]
-                                stroke_type_f1[key] /= stroke_counts[key]
-                            stroke_type_rmse["all"] = split[0]
-                            stroke_type_f1["all"] = split[1]
-
-                            continue
-                        if stroke_type_rmse.__contains__(split[2]):
-                            stroke_type_rmse[split[2]] += float(split[0])
-                            stroke_type_f1[split[2]] += float(split[1])
-                            stroke_counts[split[2]] += 1
-                        else:
-                            stroke_type_rmse[split[2]] = float(split[0])
-                            stroke_type_f1[split[2]] = float(split[1])
-                            stroke_counts[split[2]] = 1
-
-
-                temp["RMSE"] = stroke_type_rmse
-                temp["F1"] = stroke_type_f1
+                temp = read_to_dict(results_files, path=folder.name + "/" + child.name)
                 results[child.name] = temp
     with open(f'results_{str(time.time())}.json', 'w') as fp:
         json.dump(results, fp)
+
+
+def read_to_dict(results_files, path):
+    temp = {}
+    for res_name, res_file in results_files.items():
+        temp2 = {}
+        path_to_res = path + "/" + res_file
+        stroke_type_rmse, stroke_type_f1, stroke_counts = read_log(path_to_res)
+        temp2["RMSE"] = stroke_type_rmse
+        temp2["F1"] = stroke_type_f1
+        temp[res_name] = temp2
+    return temp
+
+
+def read_log(path_to_res):
+    with open(path_to_res) as f:
+        f = f.readlines()
+    f = f[1:]
+    stroke_type_rmse = {}
+    stroke_type_f1 = {}
+    stroke_counts = {}
+    for lines in f:
+        split = lines.split(",")
+        if len(split) == 2:
+            continue
+
+        if stroke_type_rmse.__contains__(split[2]):
+            stroke_type_rmse[split[2]] += float(split[0])
+            stroke_type_f1[split[2]] += float(split[1])
+            stroke_counts[split[2]] += 1
+        else:
+            stroke_type_rmse[split[2]] = float(split[0])
+            stroke_type_f1[split[2]] = float(split[1])
+            stroke_counts[split[2]] = 1
+    total_rmse = 0
+    total_f1 = 0
+
+    for key, value in stroke_type_rmse.items():
+        total_rmse += stroke_type_rmse[key]
+        total_f1 += stroke_type_f1[key]
+        stroke_type_rmse[key] /= stroke_counts[key]
+        stroke_type_f1[key] /= stroke_counts[key]
+    stroke_type_rmse["all"] = total_rmse / sum(stroke_counts.values())
+    stroke_type_f1["all"] = total_f1 / sum(stroke_counts.values())
+    return stroke_type_rmse, stroke_type_f1, stroke_counts
 
 
 if __name__ == "__main__":
@@ -208,7 +243,6 @@ if __name__ == "__main__":
         exit()
     if args.folder is not None:
         folder = args.folder
-        print("okay?")
         evaluate_folder(Path(folder), args.data, args.save, args.checkpoint)
     else:
         evaluate_one_file(args.file, args.data, args.save, args.checkpoint)

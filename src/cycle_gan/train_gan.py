@@ -9,15 +9,17 @@ from typing import Tuple, Dict, Any, List
 
 import numpy as np
 import torch
+from matplotlib import pyplot as plt
 from torch import nn
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image
 
-from . import configuration, dataset, metrics
-from .configuration import ExperimentType, FeatureType, getConfiguration
+from src import metrics
+from . import dataset_gan
+from .configuration_gan import ExperimentType, FeatureType, getConfigurationGAN, ConfigurationGAN
 from .network import image_pool
 from .network.initialise import init_weights
-from .utils import composeTransformations, getGeneratorModels, getDiscriminatorModels, getPretrainedAuxiliaryLossModel
+from .utils_gan import composeTransformations, getGeneratorModels, getDiscriminatorModels, getPretrainedAuxiliaryLossModel
 
 INFO_LOGGER_NAME = "st_removal"
 CLEAN_DISC_LOGGER_NAME = "cdLoss"
@@ -27,7 +29,7 @@ S_TO_C_GEN_LOGGER_NAME = "stocLoss"
 VALIDATION_LOGGER_NAME = "validation"
 
 
-def initLoggers(config: configuration.Configuration) -> None:
+def initLoggers(config: ConfigurationGAN) -> None:
     """
     Utility function initialising a default info logger, as well as several loss loggers.
 
@@ -65,12 +67,12 @@ def initLoggers(config: configuration.Configuration) -> None:
         networkLogger.addHandler(fileHandler)
 
 
-class TrainRunner:
+class TrainRunnerGAN:
     """
     Utility class that wraps the initialisation, training and validation steps of the training run.
     """
 
-    def __init__(self, config: configuration.Configuration):
+    def __init__(self, config: ConfigurationGAN):
         self.logger = logging.getLogger(INFO_LOGGER_NAME)
         self.ctosLogger = logging.getLogger(C_TO_S_GEN_LOGGER_NAME)
         self.stocLogger = logging.getLogger(S_TO_C_GEN_LOGGER_NAME)
@@ -82,14 +84,14 @@ class TrainRunner:
 
         transformations = composeTransformations(self.config)
 
-        trainDataset = dataset.StruckCleanDataset(self.config.trainImageDir, transforms=transformations,
-                                                  strokeTypes=self.config.trainStrokeTypes,
-                                                  count=self.config.count, featureType=self.config.featureType)
-        validationDataset = dataset.ValidationStruckCleanDataset(self.config.testImageDir,
-                                                                 transforms=transformations,
-                                                                 strokeTypes=self.config.testStrokeTypes,
-                                                                 count=self.config.validationCount,
-                                                                 featureType=self.config.featureType)
+        trainDataset = dataset_gan.StruckCleanDataset(self.config.trainImageDir, transforms=transformations,
+                                                      strokeTypes=self.config.trainStrokeTypes,
+                                                      count=self.config.count, featureType=self.config.featureType)
+        validationDataset = dataset_gan.ValidationStruckCleanDataset(self.config.testImageDir,
+                                                                     transforms=transformations,
+                                                                     strokeTypes=self.config.testStrokeTypes,
+                                                                     count=self.config.validationCount,
+                                                                     featureType=self.config.featureType)
 
         self.trainDataLoader = DataLoader(trainDataset, batch_size=self.config.batchSize, shuffle=True, num_workers=1)
         self.validationDataloader = DataLoader(validationDataset, batch_size=self.config.batchSize, shuffle=False,
@@ -391,7 +393,9 @@ class TrainRunner:
         """
         # forward first part:
         if self.config.featureType == FeatureType.NONE:
+
             generatedStruck = self.genCleanToStruck(clean)
+
         else:
             generatedStruck = self.genCleanToStruck(torch.cat((clean, strokeFeature), dim=1))
 
@@ -464,7 +468,8 @@ class TrainRunner:
         return (generatedClean, generatedStruck, genStruckToCleanCycleLoss.item(), genCleanToStruckCycleLoss.item())
 
     def trainDiscriminators(self, generatedClean: torch.Tensor, clean: torch.Tensor, generatedStruck: torch.Tensor,
-                            struck: torch.Tensor, strokeFeature: torch.Tensor) -> Tuple[float, float]:
+                            struck: torch.Tensor, strokeFeature: torch.Tensor) -> Tuple[
+        float, float]:
         """
         Trains the discriminators for one batch.
 
@@ -497,7 +502,6 @@ class TrainRunner:
             fakeStruck = self.fake_struck_pool.query(generatedStruck.detach())
             realStruckPrediction = self.struckDiscriminator(struck)
             fakeStruckPrediction = self.struckDiscriminator(fakeStruck)
-
         fakeStruckLoss = self.discriminator_criterion(fakeStruckPrediction,
                                                       torch.zeros_like(fakeStruckPrediction).to(self.config.device))
         realStruckLoss = self.discriminator_criterion(realStruckPrediction,
@@ -540,9 +544,9 @@ class TrainRunner:
 
 if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
-    conf = getConfiguration()
+    conf = getConfigurationGAN()
     initLoggers(conf)
     logger = logging.getLogger(INFO_LOGGER_NAME)
     logger.info(conf.fileSection)
-    runner = TrainRunner(conf)
+    runner = TrainRunnerGAN(conf)
     runner.train()

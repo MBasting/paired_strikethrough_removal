@@ -12,7 +12,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose
 
-from .configuration import FeatureType, StrikeThroughType
+from .configuration_gan import FeatureType, StrikeThroughType
 
 CLEAN_DIR_NAME = "clean"
 STRUCK_DIR_NAME = "struck"

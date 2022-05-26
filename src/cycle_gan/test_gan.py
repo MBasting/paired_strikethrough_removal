@@ -10,16 +10,16 @@ import torch
 import torchvision
 from torch.utils.data import DataLoader
 
-from . import metrics
-from .configuration import Configuration
-from .dataset import TestDataset
-from .utils import composeTransformations, getGeneratorModels
+from src import metrics
+from .configuration_gan import ConfigurationGAN
+from .dataset_gan import TestDataset
+from .utils_gan import composeTransformations, getGeneratorModels
 
 INFO_LOGGER_NAME = "st_removal"
 RESULTS_LOGGER_NAME = "results"
 
 
-def initLoggers(config: Configuration) -> None:
+def initLoggers(config: ConfigurationGAN) -> None:
     """
     Utility function initialising a default info logger, as well as a results logger.
 
@@ -55,12 +55,12 @@ def initLoggers(config: Configuration) -> None:
     resultsLogger.addHandler(fileHandler)
 
 
-class TestRunner:
+class TestRunnerGAN:
     """
     Utility class that wraps the initialisation and testing of a neural network.
     """
 
-    def __init__(self, configuration: Configuration, saveCleanedImages: bool = True,
+    def __init__(self, configuration: ConfigurationGAN, testImageDir, saveCleanedImages: bool = True,
                  model_name: str = "genStrikeToClean_best_fmeasure.pth"):
         self.logger = logging.getLogger(INFO_LOGGER_NAME)
         self.resultsLogger = logging.getLogger(RESULTS_LOGGER_NAME)
@@ -68,7 +68,7 @@ class TestRunner:
         self.saveCleanedImages = saveCleanedImages
 
         transformations = composeTransformations(self.config)
-        testDataset = TestDataset(self.config.testImageDir, transformations, strokeTypes=self.config.testStrokeTypes)
+        testDataset = TestDataset(testImageDir, transformations, strokeTypes=self.config.testStrokeTypes)
         self.validationDataloader = DataLoader(testDataset, batch_size=16, shuffle=False, num_workers=1)
 
         _, self.genStrikeToClean = getGeneratorModels(self.config)
@@ -158,7 +158,7 @@ if __name__ == "__main__":
             'more' if len(sections) > 1 else 'fewer')
 
     parsedConfig = configParser[section]
-    conf = Configuration(parsedConfig, test=True, fileSection=section)
+    conf = ConfigurationGAN(parsedConfig, test=True, fileSection=section)
     conf.testImageDir = dataPath
 
     out = configPath.parent / "{}_{}".format(dataPath.parent.name, dataPath.name)
@@ -169,5 +169,6 @@ if __name__ == "__main__":
     logger = logging.getLogger(INFO_LOGGER_NAME)
     logger.info(conf.outDir)
 
-    runner = TestRunner(conf, saveCleanedImages=args["save"])
+    runner = TestRunnerGAN(conf, self.config.testImageDir, saveCleanedImages=args["save"])
     runner.test()
+    out_log = out / "results.log"

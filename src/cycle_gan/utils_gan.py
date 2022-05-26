@@ -12,7 +12,7 @@ from PIL import ImageOps, Image
 from torchvision import models
 from torchvision.transforms import Compose, Resize, Grayscale, ToTensor
 
-from .configuration import ModelName, FeatureType, ExperimentType, Configuration
+from .configuration_gan import ModelName, FeatureType, ExperimentType, ConfigurationGAN
 from .network import discriminator, generators
 
 
@@ -45,7 +45,7 @@ class PadToSize:
         return self.__class__.__name__ + '()'
 
 
-def composeTransformations(config: Configuration) -> Compose:
+def composeTransformations(config: ConfigurationGAN) -> Compose:
     """
     Composes various transformations based on the given experiment configuration. :class:`ToTensor` is always the final
     transformation.
@@ -96,7 +96,7 @@ def __getInCount__(featureType: FeatureType) -> int:
     return in_count
 
 
-def getDiscriminatorModels(config: Configuration) -> Tuple[torch.nn.Module, torch.nn.Module]:
+def getDiscriminatorModels(config: ConfigurationGAN) -> Tuple[torch.nn.Module, torch.nn.Module]:
     """
     Prepares the CycleGAN discriminator models based on the given configuration.
 
@@ -120,7 +120,7 @@ def getDiscriminatorModels(config: Configuration) -> Tuple[torch.nn.Module, torc
     return cleanDiscriminator, struckDiscriminator
 
 
-def getGeneratorModels(config: Configuration) -> Tuple[torch.nn.Module, torch.nn.Module]:
+def getGeneratorModels(config: ConfigurationGAN) -> Tuple[torch.nn.Module, torch.nn.Module]:
     """
     Prepares the CycleGAN generator models based on the given configuration.
 
@@ -149,7 +149,7 @@ def getGeneratorModels(config: Configuration) -> Tuple[torch.nn.Module, torch.nn
     return genCleanToStruck, genStruckToClean
 
 
-def getPretrainedAuxiliaryLossModel(config: Configuration) -> Optional[torch.nn.Module]:
+def getPretrainedAuxiliaryLossModel(config: ConfigurationGAN) -> Optional[torch.nn.Module]:
     """
     Initialises the pretrained model used for the auxiliary loss based on the given configuration
 
