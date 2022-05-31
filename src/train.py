@@ -190,7 +190,7 @@ def train_and_evaluate_all_models(folder):
     -------
 
     """
-    # min_time = train_all_models()
+    min_time = train_all_models()
     evaluate_folder(Path(folder), None, False, False, 0)
 
 
