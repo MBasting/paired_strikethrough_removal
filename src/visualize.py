@@ -19,49 +19,50 @@ def visualize_plot(result_path):
     F1_dict = {}
     models = list()
     for ind_result, result_ind_value in result_data.items():
-        if "ORIGINAL" in ind_result or "ATTR_GUIDED" in ind_result:
-            continue
+        if "ORIGINAL" in ind_result:
+            split = ind_result.split("_")
+            model = "CYCLE_GAN_ORIGINAL"
         else:
             split = ind_result.split("_")
             model = split[1]
-            if model not in models:
-                index = len(models)
-                models.append(model)
-            else:
-                index = models.index(model)
-            train_dataset = '_'.join(split[len(split) - 2:])
+        if model not in models:
+            index = len(models)
+            models.append(model)
+        else:
+            index = models.index(model)
+        train_dataset = '_'.join(split[len(split) - 2:])
 
-            for dataset_name, result_dataset in result_ind_value.items():
-                test_dataset = dataset_name
-                joined = '-'.join([train_dataset, test_dataset])
+        for dataset_name, result_dataset in result_ind_value.items():
+            test_dataset = dataset_name
+            joined = '-'.join([train_dataset, test_dataset])
 
-                if joined not in RMSE_dict:
-                    RMSE_dict[joined] = [[[] for j in range(7)] for i in range(5)]
-                    # For each stroketype there is an array holding the results for all models
+            if joined not in RMSE_dict:
+                RMSE_dict[joined] = [[[] for j in range(7)] for i in range(6)]
+                # For each stroketype there is an array holding the results for all models
 
-                    F1_dict[joined] = {k.name: [[] for i in range(7)] for k in StrikeThroughType}
+                F1_dict[joined] = {k.name: [[] for i in range(7)] for k in StrikeThroughType}
 
-                for strokeType, strokeRes in result_dataset["RMSE"].items():
-                    if strokeType != "all":
-                        ind = StrikeThroughType.value_for_name(strokeType)
-                        RMSE_dict[joined][index][ind].append(strokeRes)
+            for strokeType, strokeRes in result_dataset["RMSE"].items():
+                if strokeType != "all":
+                    ind = StrikeThroughType.value_for_name(strokeType)
+                    RMSE_dict[joined][index][ind].append(strokeRes)
                 # for strokeType, strokeRes in result_dataset["F1"].items():
                 #     F1_dict[joined][strokeType][index].append(strokeRes)
     ticks = [stroke.name for stroke in StrikeThroughType]
-    colors = ["#7fc97f", "#beaed4", "#fdc086", "#ffff99", "#386cb0", "#f0027f", "#bf5b17"]
-    locs = np.arange(-1, 1, 2/len(models)-0.1)
+    colors = ["#7fc97f", "#beaed4", "#fdc086", "#bf5b17", "#386cb0", "#f0027f", "#ffff99"]
+    locs = np.arange(-1.5, 1.6, 3/len(models))
     # Creat a plot for each training, test dataset combination
     for ttkey, train_test_data_comb in RMSE_dict.items():
         plt.figure(figsize=(10, 10))
         # Number of rows
         # Each row of train_test_dataCOMB are the results of scores for each stroketype
         for i, model_data in enumerate(train_test_data_comb):
-            tmp = plt.boxplot(model_data, positions=np.array(range(len(model_data))) * 2 + locs[i], sym='', widths=0.3)
+            tmp = plt.boxplot(model_data, positions=np.array(range(len(model_data))) * 3 + locs[i], sym='', widths=0.3)
             set_box_color(tmp, colors[i])
             plt.plot([], c=colors[i], label=models[i])
         plt.legend(loc='upper left')
-        plt.xticks(range(0, len(ticks) * 2, 2), ticks)
-        plt.xlim(-2, len(ticks) * 2)
+        plt.xticks(range(0, len(ticks) * 3, 3), ticks)
+        plt.xlim(-2, len(ticks) * 3)
         plt.title(ttkey)
         plt.tight_layout()
         plt.savefig("figures/" + ttkey)

@@ -115,11 +115,16 @@ class Configuration:
     Holds the configuration for the current experiment.
     """
 
-    def __init__(self, parsedConfig: SectionProxy, test: bool = False, fileSection: str = "DEFAULT", train_dataset: str = "IAMsynth_full", test_dataset: str = "IAMsynth_full"):
+    def __init__(self, parsedConfig: SectionProxy, test: bool = False, fileSection: str = "DEFAULT", train_dataset = None, test_dataset = None):
         self.parsedConfig = parsedConfig
         self.fileSection = FileSection.getByName(fileSection).name
-        self.train_dataset_choice = train_dataset
-        self.test_dataset_choice = test_dataset
+        if train_dataset is not None:
+            self.train_dataset_choice = self.SetStr('dataset_choice_train', train_dataset)
+            self.test_dataset_choice = self.SetStr('dataset_choice_test', test_dataset)
+        else:
+            self.train_dataset_choice = self.getSetStr('dataset_choice_train', "IAMsynth_full")
+            self.test_dataset_choice = self.getSetStr('dataset_choice_test', "IAMsynth_full")
+
         if not test:
             self.outDir = Path(self.parsedConfig.get('out_dir')) / '{}_{}_{}_{}_{}'.format(
                 self.getSetStr("model", "DENSE"),
@@ -177,8 +182,8 @@ class Configuration:
         self.up = self.parseTiramisuConfig(self.getSetStr("up", "4"))
 
         f = parsedConfig.get("fold")
-        if f == "all" and self.train_dataset_choice == DatasetChoice.Dracula_synth.name:
-            self.fold = f
+        if f == "all" and self.train_dataset_choice == DatasetChoice.Dracula_synth.name or self.train_dataset_choice == DatasetChoice.Dracula_synth.name:
+            self.fold = "all"
             self.parsedConfig["fold"] = "all"
         else:
             self.fold = self.getSetInt("fold", -1)
@@ -211,6 +216,10 @@ class Configuration:
         value = self.parsedConfig.get(key, default)
         self.parsedConfig[key] = str(value)
         return value
+
+    def SetStr(self, key: str, default: str = None):
+        self.parsedConfig[key] = str(default)
+        return default
 
     @staticmethod
     def parseBetas(betaString: str) -> Tuple[float, float]:

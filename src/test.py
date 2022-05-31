@@ -110,6 +110,9 @@ class TestRunner:
 
 def evaluate_one_file(file, data, save, checkpoint, GAN=False):
     configPath = Path(file)
+    name_config = configPath.parent.name
+    split = name_config.split("_")
+    train_dataset = '_'.join(split[len(split) - 2:])
     if data is not None:
         dataPath = Path(data)
     saveCleanedImages = save
@@ -120,18 +123,17 @@ def evaluate_one_file(file, data, save, checkpoint, GAN=False):
 
     section = "DEFAULT"
     sections = configParser.sections()
-    if len(sections) == 1:
-        section = sections[0]
+    if len(sections) >= 1:
+        section = sections[-1]
     else:
         logging.getLogger("st_recognition").warning("Found %s than one named sections in config file. Using 'DEFAULT' "
                                                     "as fallback.", 'more' if len(sections) > 1 else 'fewer')
-    print(file)
     parsedConfig = configParser[section]
     if not GAN:
-        conf = Configuration(parsedConfig, test=True, fileSection=section)
+        conf = Configuration(parsedConfig, test=True, fileSection=section, train_dataset=train_dataset, test_dataset="IAMsynth_full")
         dataset_dir = conf.dataset_dir
     else:
-        conf = ConfigurationGAN(parsedConfig, test=True, fileSection=section)
+        conf = ConfigurationGAN(parsedConfig, test=True, fileSection=section, train_dataset=train_dataset, test_dataset="IAMsynth_full")
         dataset_dir = "datasets"
 
     if data is not None:

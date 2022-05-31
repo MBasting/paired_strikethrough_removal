@@ -173,7 +173,7 @@ def train_all_models():
             else:
                 conf = getDynamicConfigurationGAN(section, None, train_dataset=train_dataset_choice,
                                                 test_dataset=valid_dataset_choice)
-                runner = TrainRunnerGAN(conf)
+                runner = TrainRunnerGAN(conf, True)
                 runner.train()
     return min_time
 
@@ -190,8 +190,8 @@ def train_and_evaluate_all_models(folder):
     -------
 
     """
-    min_time = train_all_models()
-    evaluate_folder(Path(folder), None, False, False, min_time)
+    # min_time = train_all_models()
+    evaluate_folder(Path(folder), None, False, False, 0)
 
 
 # Note: To run using IDE, make sure working directory is root folder!

@@ -167,7 +167,7 @@ class ConfigurationGAN:
         self.modelSaveEpoch = parsedConfig.getint('modelsaveepoch', 10)
         self.validationEpoch = parsedConfig.getint('validation', 10)
 
-        self.dataset_dir = parsedConfig.get('dataset_dir')
+        self.dataset_dir = parsedConfig.get('dataset_dir', 'datasets')
         full_dataset_path = self.dataset_dir + "/"
         self.trainImageDir = Path(
             full_dataset_path + self.train_dataset_choice)
