@@ -12,6 +12,8 @@ from typing import List, Tuple
 
 import torch
 
+from src.configuration import DatasetChoice
+
 
 class StrikeThroughType(Enum):
     """
@@ -133,11 +135,19 @@ class ConfigurationGAN:
     Holds the configuration for the current experiment.
     """
 
-    def __init__(self, parsedConfig: SectionProxy, test: bool = False, fileSection: str = "DEFAULT"):
+    def __init__(self, parsedConfig: SectionProxy, test: bool = False, fileSection: str = "DEFAULT",
+                 train_dataset=None, test_dataset= None):
         self.fileSection = fileSection
+        if train_dataset is not None:
+            self.train_dataset_choice = train_dataset
+            self.test_dataset_choice = test_dataset
+        else:
+            self.train_dataset_choice = parsedConfig.get('dataset_choice_train')
+            self.test_dataset_choice = parsedConfig.get('dataset_choice_test')
+
         if not test:
-            self.outDir = Path(parsedConfig.get('outdir')) / '{}_{}_{}'.format(fileSection, str(int(time.time())),
-                                                                               random.randint(0, 100000))
+            self.outDir = Path(parsedConfig.get('outdir')) / '{}_{}_{}_{}'.format(fileSection, str(int(time.time())),
+                                                                                  random.randint(0, 100000), self.train_dataset_choice)
             parsedConfig['outdir'] = str(self.outDir)
 
         if not test and not self.outDir.exists():
@@ -156,8 +166,13 @@ class ConfigurationGAN:
         self.imageWidth = parsedConfig.getint('imagewidth', 256)
         self.modelSaveEpoch = parsedConfig.getint('modelsaveepoch', 10)
         self.validationEpoch = parsedConfig.getint('validation', 10)
-        self.trainImageDir = Path(parsedConfig.get('trainimgagebasedir'))
-        self.testImageDir = Path(parsedConfig.get('testimagedir'))
+
+        self.dataset_dir = parsedConfig.get('dataset_dir')
+        full_dataset_path = self.dataset_dir + "/"
+        self.trainImageDir = Path(
+            full_dataset_path + self.train_dataset_choice)
+        self.testImageDir = Path(
+            full_dataset_path + self.test_dataset_choice)
         self.invertImages = parsedConfig.getboolean('invert_images', False)
 
         self.blockCount = parsedConfig.getint('blockcount', 6)
@@ -190,6 +205,15 @@ class ConfigurationGAN:
         self.discWithFeature = parsedConfig.getboolean('disc_feature', False)
         if self.featureType == FeatureType.NONE:
             self.discWithFeature = False
+
+        f = parsedConfig.get("fold")
+        if f == "all" and self.train_dataset_choice == DatasetChoice.Dracula_synth.name:
+            self.fold = f
+            parsedConfig["fold"] = "all"
+        else:
+            self.fold = f
+            if self.fold != -1 and self.train_dataset_choice != DatasetChoice.Dracula_synth.name:
+                self.fold = -1
 
         self.modelName = ModelName.getByName(parsedConfig.get("model", "RESNET"))
 
@@ -255,9 +279,12 @@ class ConfigurationGAN:
         return strokeTypes
 
 
-def getDynamicConfigurationGAN(configSection, configFile) -> ConfigurationGAN:
+def getDynamicConfigurationGAN(configSection, configFile, train_dataset=None, test_dataset=None, dynamic=True) -> ConfigurationGAN:
     fileSection = 'ORIGINAL'
-    fileName = 'config_files/serverConfig_strike_rem2.cfg'
+    if dynamic:
+        fileName = 'config_files/serverConfig_strike_rem_dyn.cfg'
+    else:
+        fileName = 'config_files/serverConfig_strike_rem.cfg'
     if configSection:
         fileSection = configSection
     if configFile:
@@ -269,7 +296,11 @@ def getDynamicConfigurationGAN(configSection, configFile) -> ConfigurationGAN:
     for s in sections:
         if s != fileSection:
             configParser.remove_section(s)
-    return ConfigurationGAN(parsedConfig, fileSection=fileSection)
+    if train_dataset is not None and test_dataset is not None:
+        return ConfigurationGAN(parsedConfig, fileSection=fileSection, train_dataset=train_dataset,
+                                test_dataset=test_dataset)
+    else:
+        return ConfigurationGAN(parsedConfig, fileSection=fileSection)
 
 
 def getConfigurationGAN() -> ConfigurationGAN:
@@ -284,4 +315,4 @@ def getConfigurationGAN() -> ConfigurationGAN:
     cmdParser.add_argument("-config", required=False, help="section of config-file to use")
     cmdParser.add_argument("-configfile", required=False, help="path to config-file")
     args = vars(cmdParser.parse_args())
-    return getDynamicConfigurationGAN(args["config"], args['configfile'])
+    return getDynamicConfigurationGAN(args["config"], args['configfile'], dynamic=True)

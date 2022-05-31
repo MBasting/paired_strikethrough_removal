@@ -12,12 +12,12 @@ from torch.utils.data import DataLoader
 from torchvision.utils import save_image
 
 from src import configuration, metrics
-from src.configuration import ModelName, getConfiguration, DatasetChoice, FileSection, getConfiguration_dynamic
+from src.configuration import ModelName, DatasetChoice, FileSection, getConfiguration_dynamic
 from src.dataset import PairedDataset
 from src.utils import initLoggers, composeTransformations, PadToSize, getModel
 from src.test import evaluate_folder
-from .cycle_gan.configuration_gan import getConfigurationGAN
-from .cycle_gan.train_gan import TrainRunnerGAN
+from src.cycle_gan.configuration_gan import getDynamicConfigurationGAN
+from src.cycle_gan.train_gan import TrainRunnerGAN
 
 
 class TrainRunner:
@@ -149,33 +149,32 @@ class TrainRunner:
 
 def train_all_models():
     # For any other change in configuration add a loop and change of arguments!
-    training_datasets = [dataset.name for dataset in DatasetChoice if dataset is not DatasetChoice.Dracula_synth]
+    training_datasets = [dataset.name for dataset in DatasetChoice]
     model_configs = [section.name for section in FileSection]
-    model_configs.append("CYCLEGAN")
+    model_configs.append("ORIGINAL")
     min_time = time.time()
     for section in model_configs:
         for dataset in training_datasets:
             train_dataset_choice = dataset
-            test_dataset_choice = dataset
-            if test_dataset_choice is DatasetChoice.Dracula_synth.name:
-                test_dataset_choice = DatasetChoice.Dracula_real.name
-            if section != "CYCLEGAN":
+            valid_dataset_choice = dataset
+            if valid_dataset_choice is DatasetChoice.Dracula_synth.name:
+                valid_dataset_choice = DatasetChoice.Dracula_real.name
+            # If we are not training the GAN use default training process
+            if section != "ORIGINAL":
                 conf = getConfiguration_dynamic(None, section, train_dataset=train_dataset_choice,
-                                                test_dataset=test_dataset_choice)
+                                                test_dataset=valid_dataset_choice)
                 initLoggers(conf, 'str_ae', ['reconstructionLoss', 'val'])
                 logging.getLogger("str_ae").info(conf.fileSection)
                 logging.getLogger("str_ae").info(conf.train_dataset_choice)
                 logging.getLogger("str_ae").info(conf.test_dataset_choice)
                 runner = TrainRunner(conf)
                 runner.run()
+            # # Else call GAN training SETUP
             else:
-                conf = getConfigurationGAN()
+                conf = getDynamicConfigurationGAN(section, None, train_dataset=train_dataset_choice,
+                                                test_dataset=valid_dataset_choice)
                 runner = TrainRunnerGAN(conf)
                 runner.train()
-                initLoggers(conf, 'str_ae', ['reconstructionLoss', 'val'])
-                logging.getLogger("str_ae").info(conf.fileSection)
-                logging.getLogger("str_ae").info(conf.trainImageDir)
-                logging.getLogger("str_ae").info(conf.testImageDir)
     return min_time
 
 
@@ -191,14 +190,14 @@ def train_and_evaluate_all_models(folder):
     -------
 
     """
-    # min_time = train_all_models()
-    evaluate_folder(folder, None, False, False, 0)
+    min_time = train_all_models()
+    evaluate_folder(Path(folder), None, False, False, min_time)
 
 
 # Note: To run using IDE, make sure working directory is root folder!
 if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
-    train_and_evaluate_all_models(Path('tmp'))
+    train_and_evaluate_all_models('tmp')
     # initLoggers(conf, 'str_ae', ['reconstructionLoss', 'val'])
     # logging.getLogger("str_ae").info(conf.fileSection)
     # runner = TrainRunner(conf)

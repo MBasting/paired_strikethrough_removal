@@ -3,11 +3,13 @@ from pathlib import Path
 from typing import Dict, Any, List, Union
 
 import pandas as pd
+import torch
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose
 
 from src.configuration import StrikeThroughType
+from src.cycle_gan import FeatureType
 
 
 class PairedDataset(Dataset):
@@ -16,7 +18,8 @@ class PairedDataset(Dataset):
     """
 
     def __init__(self, rootDir: Path, fold: Union[int, str] = 0, transforms: Compose = None,
-                 strokeTypes: Union[List[str], List[StrikeThroughType]] = None, mode: str = "train"):
+                 strokeTypes: Union[List[str], List[StrikeThroughType]] = None, mode: str = "train",
+                 featureType: FeatureType = FeatureType.NONE):
         """
         Parameters
         ----------
@@ -40,18 +43,17 @@ class PairedDataset(Dataset):
                 self.struckDir = rootDir / "icdar2021" / mode / "struck"
             else:
                 self.struckDir = rootDir / "generated" / mode
-            self.groundTruthDir = rootDir / "icdar2021" / mode / "struck_gt"
+            self.groundTruthDir = rootDir.parent / "Dracula_real" / mode / "struck_gt"
 
         elif fold >= 0:
             if mode == "validation":
                 self.struckDir = rootDir / "icdar2021" / mode / "struck"
             else:
                 self.struckDir = rootDir / "generated" / mode / "fold_{}".format(fold)
-            self.groundTruthDir = rootDir / "icdar2021" / mode / "struck_gt"
+            self.groundTruthDir = rootDir.parent / "Dracula_real" / mode / "struck_gt"
         else:
             self.struckDir = rootDir / mode / "struck"
             self.groundTruthDir = rootDir / mode / "struck_gt"
-
         if fold == "all" and mode != "validation":
             foldData = []
             for foldIndex in range(5):
@@ -64,6 +66,11 @@ class PairedDataset(Dataset):
             self.data = pd.read_csv(self.struckDir / "struck_{}.csv".format(mode), dtype={"image_id": str})
         if strokeTypes and "all" not in strokeTypes:
             self.data = self.data[self.data["strike_type"].isin(strokeTypes)].reset_index()
+        self.featureType = featureType
+        if self.featureType != FeatureType.NONE:
+            logger = logging.getLogger("st_removal")
+            logger.warning("Selected FeatureType not supported in this training setting, defaulting to FeatureType.NONE")
+            self.featureType = FeatureType.NONE
 
     def __len__(self) -> int:
         return len(self.data)
@@ -111,7 +118,7 @@ class TestDataset(Dataset):
     """
 
     def __init__(self, rootDir: Path, transforms: Compose = None,
-                 strokeTypes: Union[List[StrikeThroughType], List[str]] = None):
+                 strokeTypes: Union[List[StrikeThroughType], List[str]] = None, featureType: FeatureType = FeatureType.NONE):
         """
         Parameters
         ----------
@@ -132,6 +139,7 @@ class TestDataset(Dataset):
             self.strokeTypes = ["all"]
         else:
             self.strokeTypes = strokeTypes
+        self.featureType = featureType
 
         csvGlob = list(self.struckDir.glob("*.csv"))
         if len(csvGlob) > 1:

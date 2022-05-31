@@ -15,11 +15,13 @@ from torch.utils.data import DataLoader
 from torchvision.utils import save_image
 
 from src import metrics
-from . import dataset_gan
+from src.cycle_gan import dataset_gan
+from src.dataset import PairedDataset
 from .configuration_gan import ExperimentType, FeatureType, getConfigurationGAN, ConfigurationGAN
 from .network import image_pool
 from .network.initialise import init_weights
-from .utils_gan import composeTransformations, getGeneratorModels, getDiscriminatorModels, getPretrainedAuxiliaryLossModel
+from .utils_gan import composeTransformations, getGeneratorModels, getDiscriminatorModels, \
+    getPretrainedAuxiliaryLossModel
 
 INFO_LOGGER_NAME = "st_removal"
 CLEAN_DISC_LOGGER_NAME = "cdLoss"
@@ -72,7 +74,7 @@ class TrainRunnerGAN:
     Utility class that wraps the initialisation, training and validation steps of the training run.
     """
 
-    def __init__(self, config: ConfigurationGAN):
+    def __init__(self, config: ConfigurationGAN, dynamic = False):
         self.logger = logging.getLogger(INFO_LOGGER_NAME)
         self.ctosLogger = logging.getLogger(C_TO_S_GEN_LOGGER_NAME)
         self.stocLogger = logging.getLogger(S_TO_C_GEN_LOGGER_NAME)
@@ -81,19 +83,39 @@ class TrainRunnerGAN:
         self.valLogger = logging.getLogger(VALIDATION_LOGGER_NAME)
 
         self.config = config
-
+        self.dynamic = dynamic
         transformations = composeTransformations(self.config)
 
-        trainDataset = dataset_gan.StruckCleanDataset(self.config.trainImageDir, transforms=transformations,
-                                                      strokeTypes=self.config.trainStrokeTypes,
-                                                      count=self.config.count, featureType=self.config.featureType)
-        validationDataset = dataset_gan.ValidationStruckCleanDataset(self.config.testImageDir,
-                                                                     transforms=transformations,
-                                                                     strokeTypes=self.config.testStrokeTypes,
-                                                                     count=self.config.validationCount,
-                                                                     featureType=self.config.featureType)
+        if dynamic:
+            trainDataset = PairedDataset(config.trainImageDir, fold=self.config.fold, mode="train",
+                                         transforms=transformations, strokeTypes=self.config.trainStrokeTypes)
+            self.trainDataLoader = DataLoader(trainDataset, batch_size=self.config.batchSize, shuffle=True,
+                                              num_workers=1)
 
+            validationDataset = PairedDataset(config.testImageDir, fold=-1, mode="validation",
+                                              transforms=transformations, strokeTypes=self.config.testStrokeTypes)
+            self.validationDataloader = DataLoader(validationDataset, batch_size=self.config.batchSize, shuffle=False,
+                                                   num_workers=1)
+        else:
+            trainDataset = dataset_gan.StruckCleanDataset(self.config.trainImageDir, transforms=transformations,
+                                                          strokeTypes=self.config.trainStrokeTypes,
+                                                          count=self.config.count, featureType=self.config.featureType)
+            validationDataset = dataset_gan.ValidationStruckCleanDataset(self.config.testImageDir,
+                                                                         transforms=transformations,
+                                                                         strokeTypes=self.config.testStrokeTypes,
+                                                                         count=self.config.validationCount,
+                                                                         featureType=self.config.featureType)
+
+            self.trainDataLoader = DataLoader(trainDataset, batch_size=self.config.batchSize, shuffle=True, num_workers=1)
+            self.validationDataloader = DataLoader(validationDataset, batch_size=self.config.batchSize, shuffle=False,
+                                                   num_workers=1)
+
+        trainDataset = PairedDataset(config.trainImageDir, fold=self.config.fold, mode="train",
+                                     transforms=transformations, strokeTypes=self.config.trainStrokeTypes)
         self.trainDataLoader = DataLoader(trainDataset, batch_size=self.config.batchSize, shuffle=True, num_workers=1)
+
+        validationDataset = PairedDataset(config.testImageDir, fold=-1, mode="validation",
+                                    transforms=transformations, strokeTypes=self.config.testStrokeTypes)
         self.validationDataloader = DataLoader(validationDataset, batch_size=self.config.batchSize, shuffle=False,
                                                num_workers=1)
 
@@ -193,9 +215,14 @@ class TrainRunnerGAN:
                 struckToCleanPairs = torch.Tensor().to(self.config.device)
 
                 if self.config.featureType == FeatureType.NONE:
-                    clean = datapoints["clean"]
+                    if self.dynamic:
+                        clean = datapoints["groundTruth"]
+                        struckImageGroundTruth = clean
+                    else:
+                        clean = datapoints["clean"]
+                        struckImageGroundTruth = datapoints["struckGt"]
                     struck = datapoints["struck"]
-                    struckImageGroundTruth = datapoints["struckGt"]
+
                 else:
                     clean = datapoints["clean"]
                     struck = datapoints["struck"]
@@ -339,7 +366,10 @@ class TrainRunnerGAN:
         self.generatorOptimiser.zero_grad()
 
         if self.config.featureType == FeatureType.NONE:
-            clean = datapoints["clean"]
+            if self.dynamic:
+                clean = datapoints["groundTruth"]
+            else:
+                clean = datapoints["clean"]
             struck = datapoints["struck"]
             strokeType = datapoints["strokeType"]
             strokeFeature = None
@@ -352,7 +382,9 @@ class TrainRunnerGAN:
 
         clean = clean.to(self.config.device)
         struck = struck.to(self.config.device)
-        strokeType = strokeType.to(self.config.device)
+        if not self.dynamic:
+            strokeType = strokeType.to(self.config.device)
+
 
         (generatedClean, generatedStruck, genStruckToCleanCycleLoss, genCleanToStruckCycleLoss) = self.trainGenerators(
             clean, struck, strokeFeature, strokeType)
@@ -548,5 +580,5 @@ if __name__ == "__main__":
     initLoggers(conf)
     logger = logging.getLogger(INFO_LOGGER_NAME)
     logger.info(conf.fileSection)
-    runner = TrainRunnerGAN(conf)
+    runner = TrainRunnerGAN(conf, True)
     runner.train()

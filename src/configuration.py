@@ -71,7 +71,7 @@ class FileSection(Enum):
     Encodes the names of supported sections
     """
     DEFAULT = auto()
-    SIMPLE_CNN = auto()
+    CNN = auto()
     SHALLOW = auto()
     UNET = auto()
     GENERATOR = auto()
@@ -291,6 +291,9 @@ def getConfiguration_dynamic(file=None, section=None, train_dataset=None, test_d
     configParser = configparser.ConfigParser()
     configParser.read(fileName)
     parsedConfig = configParser[fileSection]
+    # Assume we always train on All Folds!
+    if train_dataset == DatasetChoice.Dracula_synth.name:
+        parsedConfig.__setitem__("fold", "all")
     sections = configParser.sections()
     for s in sections:
         if s != fileSection:
