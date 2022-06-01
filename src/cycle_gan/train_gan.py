@@ -31,7 +31,7 @@ S_TO_C_GEN_LOGGER_NAME = "stocLoss"
 VALIDATION_LOGGER_NAME = "validation"
 
 
-def initLoggers(config: ConfigurationGAN) -> None:
+def initLoggersGAN(config: ConfigurationGAN) -> None:
     """
     Utility function initialising a default info logger, as well as several loss loggers.
 
@@ -577,7 +577,7 @@ class TrainRunnerGAN:
 if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
     conf = getConfigurationGAN()
-    initLoggers(conf)
+    initLoggersGAN(conf)
     logger = logging.getLogger(INFO_LOGGER_NAME)
     logger.info(conf.fileSection)
     runner = TrainRunnerGAN(conf, True)

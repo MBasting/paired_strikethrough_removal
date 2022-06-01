@@ -17,7 +17,7 @@ from src.dataset import PairedDataset
 from src.utils import initLoggers, composeTransformations, PadToSize, getModel
 from src.test import evaluate_folder
 from src.cycle_gan.configuration_gan import getDynamicConfigurationGAN
-from src.cycle_gan.train_gan import TrainRunnerGAN
+from src.cycle_gan.train_gan import TrainRunnerGAN, initLoggersGAN
 
 
 class TrainRunner:
@@ -151,16 +151,24 @@ def train_all_models():
     # For any other change in configuration add a loop and change of arguments!
     training_datasets = [dataset.name for dataset in DatasetChoice]
     model_configs = [section.name for section in FileSection]
+    training_datasets.reverse()
     model_configs.append("ORIGINAL")
     min_time = time.time()
+
     for section in model_configs:
         for dataset in training_datasets:
             train_dataset_choice = dataset
             valid_dataset_choice = dataset
             if valid_dataset_choice is DatasetChoice.Dracula_synth.name:
                 valid_dataset_choice = DatasetChoice.Dracula_real.name
-            # If we are not training the GAN use default training process
-            if section != "ORIGINAL":
+            if section == "ORIGINAL":
+                conf = getDynamicConfigurationGAN(section, None, train_dataset=train_dataset_choice, test_dataset=valid_dataset_choice)
+                initLoggersGAN(conf)
+                logger = logging.getLogger("st_removal")
+                logger.info(conf.fileSection)
+                runner = TrainRunnerGAN(conf, True)
+                runner.train()
+            else:
                 conf = getConfiguration_dynamic(None, section, train_dataset=train_dataset_choice,
                                                 test_dataset=valid_dataset_choice)
                 initLoggers(conf, 'str_ae', ['reconstructionLoss', 'val'])
@@ -169,12 +177,7 @@ def train_all_models():
                 logging.getLogger("str_ae").info(conf.test_dataset_choice)
                 runner = TrainRunner(conf)
                 runner.run()
-            # # Else call GAN training SETUP
-            else:
-                conf = getDynamicConfigurationGAN(section, None, train_dataset=train_dataset_choice,
-                                                test_dataset=valid_dataset_choice)
-                runner = TrainRunnerGAN(conf, True)
-                runner.train()
+
     return min_time
 
 
@@ -190,6 +193,7 @@ def train_and_evaluate_all_models(folder):
     -------
 
     """
+
     min_time = train_all_models()
     evaluate_folder(Path(folder), None, False, False, 0)
 

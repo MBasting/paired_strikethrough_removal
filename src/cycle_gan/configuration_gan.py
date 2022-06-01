@@ -135,7 +135,7 @@ class ConfigurationGAN:
     Holds the configuration for the current experiment.
     """
 
-    def __init__(self, parsedConfig: SectionProxy, test: bool = False, fileSection: str = "DEFAULT",
+    def __init__(self, parsedConfig: SectionProxy, test: bool = False, fileSection: str = "ORIGINAL",
                  train_dataset=None, test_dataset= None):
         self.fileSection = fileSection
         if train_dataset is not None:
@@ -156,7 +156,6 @@ class ConfigurationGAN:
             self.device = 'cuda'
         else:
             self.device = 'cpu'
-
         self.epochs = parsedConfig.getint('epochs', 100)
         self.learningRate = parsedConfig.getfloat('learning_rate', 0.0002)
         self.betas = self.parseBetas(parsedConfig.get("betas", "0.5,0.999"))
@@ -207,8 +206,8 @@ class ConfigurationGAN:
             self.discWithFeature = False
 
         f = parsedConfig.get("fold")
-        if f == "all" and self.train_dataset_choice == DatasetChoice.Dracula_synth.name:
-            self.fold = f
+        if f == "all" and self.train_dataset_choice == DatasetChoice.Dracula_synth.name or self.train_dataset_choice == DatasetChoice.Dracula_synth.name:
+            self.fold = "all"
             parsedConfig["fold"] = "all"
         else:
             self.fold = f
