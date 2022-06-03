@@ -61,7 +61,7 @@ def visualize_plot(result_path):
             # Number of rows
             # Each row of train_test_dataCOMB are the results of scores for each stroketype
             for i, model_data in enumerate(train_test_data_comb):
-                tmp = plt.boxplot(model_data, positions=np.array(range(len(model_data))) * 3 + locs[i], sym='', widths=0.3)
+                tmp = plt.boxplot(model_data, positions=np.array(range(len(model_data))) * 3 + locs[i], sym='', widths=0.25)
                 set_box_color(tmp, colors[i])
                 plt.plot([], c=colors[i], label=models[i])
             if error_name == "RMSE":
