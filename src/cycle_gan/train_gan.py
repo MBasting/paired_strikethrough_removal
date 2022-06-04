@@ -9,7 +9,6 @@ from typing import Tuple, Dict, Any, List
 
 import numpy as np
 import torch
-from matplotlib import pyplot as plt
 from torch import nn
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image
@@ -22,6 +21,7 @@ from .network import image_pool
 from .network.initialise import init_weights
 from .utils_gan import composeTransformations, getGeneratorModels, getDiscriminatorModels, \
     getPretrainedAuxiliaryLossModel
+from torch.utils.tensorboard import SummaryWriter
 
 INFO_LOGGER_NAME = "st_removal"
 CLEAN_DISC_LOGGER_NAME = "cdLoss"
@@ -74,13 +74,15 @@ class TrainRunnerGAN:
     Utility class that wraps the initialisation, training and validation steps of the training run.
     """
 
-    def __init__(self, config: ConfigurationGAN, dynamic = False):
+    def __init__(self, config: ConfigurationGAN, dynamic=False, binarize=False):
         self.logger = logging.getLogger(INFO_LOGGER_NAME)
         self.ctosLogger = logging.getLogger(C_TO_S_GEN_LOGGER_NAME)
         self.stocLogger = logging.getLogger(S_TO_C_GEN_LOGGER_NAME)
         self.cdLogger = logging.getLogger(CLEAN_DISC_LOGGER_NAME)
         self.sdLogger = logging.getLogger(STRUCK_DISC_LOGGER_NAME)
         self.valLogger = logging.getLogger(VALIDATION_LOGGER_NAME)
+
+        self.binarize = binarize
 
         self.config = config
         self.dynamic = dynamic
@@ -106,7 +108,8 @@ class TrainRunnerGAN:
                                                                          count=self.config.validationCount,
                                                                          featureType=self.config.featureType)
 
-            self.trainDataLoader = DataLoader(trainDataset, batch_size=self.config.batchSize, shuffle=True, num_workers=1)
+            self.trainDataLoader = DataLoader(trainDataset, batch_size=self.config.batchSize, shuffle=True,
+                                              num_workers=1)
             self.validationDataloader = DataLoader(validationDataset, batch_size=self.config.batchSize, shuffle=False,
                                                    num_workers=1)
 
@@ -115,7 +118,7 @@ class TrainRunnerGAN:
         self.trainDataLoader = DataLoader(trainDataset, batch_size=self.config.batchSize, shuffle=True, num_workers=1)
 
         validationDataset = PairedDataset(config.testImageDir, fold=-1, mode="validation",
-                                    transforms=transformations, strokeTypes=self.config.testStrokeTypes)
+                                          transforms=transformations, strokeTypes=self.config.testStrokeTypes)
         self.validationDataloader = DataLoader(validationDataset, batch_size=self.config.batchSize, shuffle=False,
                                                num_workers=1)
 
@@ -148,6 +151,8 @@ class TrainRunnerGAN:
             lr=self.config.learningRate, betas=self.config.betas)
 
         self.discriminator_criterion = nn.MSELoss()
+        if binarize:
+            self.discriminator_criterion = nn.BCELoss()
         self.image_l1_criterion = nn.L1Loss()
 
         self.fake_clean_pool = image_pool.ImagePool(self.config.poolSize)
@@ -165,6 +170,7 @@ class TrainRunnerGAN:
         self.bestRmseEpoch = 0
         self.bestFscore = float('-inf')
         self.bestFscoreEpoch = 0
+        self.writer = SummaryWriter(log_dir=f"runs/batch_{self.config.batchSize}_IdL_{self.config.identityLambda}_LamStruck_{self.config.struckLambda}_LamClean_{self.config.cleanLambda}_ep_{self.config.epochs}_{str(int(time.time()))}")
 
     def train(self) -> None:
         """
@@ -185,6 +191,7 @@ class TrainRunnerGAN:
                 self.validateOneEpoch(epoch)
         self.logger.info("best rmse: %f (%d), best fmeasure: %f (%d)", self.bestRmse, self.bestRmseEpoch,
                          self.bestFscore, self.bestFscoreEpoch)
+        self.writer.close()
 
     def validateOneEpoch(self, epoch: int) -> None:
         """
@@ -269,8 +276,14 @@ class TrainRunnerGAN:
                                                  binarise=True)[0])
         meanRMSE = np.mean(rmses)
         meanF = np.mean(fmeasures)
+
         self.logger.info('val [%d/%d], rmse: %f, fmeasure: %f', epoch, self.config.epochs, meanRMSE, meanF)
 
+        self.writer.add_scalars('Fitness', {
+            'RMSE': meanRMSE,
+            'meanF': meanF
+        }, epoch)
+        self.writer.flush()
         self.valLogger.info("%f,%f", meanRMSE, meanF)
 
         if meanRMSE < self.bestRmse:
@@ -330,6 +343,21 @@ class TrainRunnerGAN:
             totalCleanToStruckGeneratorLoss.append(genCleanToStruckCycleLoss)
 
         run_time = time.time() - epochStartTime
+        self.writer.add_scalars('DiscriminatorLossClean', {
+            'Train': np.mean(totalDiscriminatorLossClean),
+        }, epoch)
+        self.writer.add_scalars('DiscriminatorLossStruck', {
+            'Train': np.mean(totalDiscriminatorLossStruck),
+        }, epoch)
+
+        self.writer.add_scalars('Total_Clean_to_Struck', {
+            'Train': np.mean(totalCleanToStruckGeneratorLoss)
+        }, epoch)
+        self.writer.add_scalars('Total_Struck_to_Clean', {
+            'Train': np.mean(totalStruckToCleanGeneratorLoss)
+        }, epoch)
+        self.writer.flush()
+
         self.logger.info('epoch [%d/%d], discriminator losses: clean %f, struck %f,'
                          ' generator losses: ctos %f, stoc %f, time:%f', epoch, self.config.epochs,
                          np.mean(totalDiscriminatorLossClean), np.mean(totalDiscriminatorLossStruck),
@@ -385,16 +413,15 @@ class TrainRunnerGAN:
         if not self.dynamic:
             strokeType = strokeType.to(self.config.device)
 
-
         (generatedClean, generatedStruck, genStruckToCleanCycleLoss, genCleanToStruckCycleLoss) = self.trainGenerators(
-            clean, struck, strokeFeature, strokeType)
+            clean, struck, strokeFeature, strokeType, batchID, epoch)
 
         self.stocLogger.info("%d,%d,%f", epoch, batchID, genStruckToCleanCycleLoss)
         self.ctosLogger.info("%d,%d,%f", epoch, batchID, genCleanToStruckCycleLoss)
 
         discriminatorLossStruck, discriminatorLossClean = self.trainDiscriminators(generatedClean, clean,
                                                                                    generatedStruck, struck,
-                                                                                   strokeFeature)
+                                                                                   strokeFeature, batchID, epoch)
 
         self.sdLogger.info("%d,%d,%f", epoch, batchID, discriminatorLossStruck)
         self.cdLogger.info("%d,%d,%f", epoch, batchID, discriminatorLossClean)
@@ -402,7 +429,7 @@ class TrainRunnerGAN:
         return genStruckToCleanCycleLoss, genCleanToStruckCycleLoss, discriminatorLossClean, discriminatorLossStruck
 
     def trainGenerators(self, clean: torch.Tensor, struck: torch.Tensor, strokeFeature: torch.Tensor,
-                        strokeType: List[int]) -> Tuple[torch.Tensor, torch.Tensor, float, float]:
+                        strokeType: List[int], batchID, epoch) -> Tuple[torch.Tensor, torch.Tensor, float, float]:
         """
         Trains the CycleGAN generators for one batch.
 
@@ -465,6 +492,7 @@ class TrainRunnerGAN:
 
         cleanDiscrimination = self.cleanDiscriminator(generatedClean)
 
+
         lossStruckDiscriminator = self.discriminator_criterion(struckDiscrimination,
                                                                torch.ones_like(struckDiscrimination).to(
                                                                    self.config.device))
@@ -493,6 +521,17 @@ class TrainRunnerGAN:
         else:
             totalGeneratorLoss = (genCleanToStruckCycleLoss + genStruckToCleanCycleLoss + struckIdentityLoss +
                                   cleanIdentityLoss + lossStruckDiscriminator + lossCleanDiscriminator)
+        if batchID % 5 == 0:
+            self.writer.add_scalars('Losses_per_batch_Generator', {
+                'struckIdentity': struckIdentityLoss,
+                'cleanIdentityLoss': cleanIdentityLoss,
+                'struckDiscrimination': lossStruckDiscriminator,
+                'cleanDiscrimination': lossCleanDiscriminator,
+                'lossStruckDiscriminator': lossStruckDiscriminator,
+                'CycleLoss_struckCLean': genStruckToCleanCycleLoss,
+                'CycleLoss_CleanStruck': genCleanToStruckCycleLoss,
+                'TotalLoss': totalGeneratorLoss
+            }, batchID * epoch)
 
         totalGeneratorLoss.backward()
         self.generatorOptimiser.step()
@@ -500,7 +539,7 @@ class TrainRunnerGAN:
         return (generatedClean, generatedStruck, genStruckToCleanCycleLoss.item(), genCleanToStruckCycleLoss.item())
 
     def trainDiscriminators(self, generatedClean: torch.Tensor, clean: torch.Tensor, generatedStruck: torch.Tensor,
-                            struck: torch.Tensor, strokeFeature: torch.Tensor) -> Tuple[
+                            struck: torch.Tensor, strokeFeature: torch.Tensor, batchID, epoch) -> Tuple[
         float, float]:
         """
         Trains the discriminators for one batch.
@@ -552,6 +591,11 @@ class TrainRunnerGAN:
                                                      torch.ones_like(realCleanPrediction).to(self.config.device))
         discriminatorLossClean = (fakeCleanLoss + realCleanLoss) * 0.5
         discriminatorLossClean.backward()
+
+        self.writer.add_scalars('Losses_per_batch_Discriminator', {
+            'fakeCleanLoss' : fakeCleanLoss,
+            'realCleanLoss' : realCleanLoss
+        }, batchID * epoch)
 
         self.discriminatorOptimiser.step()
 

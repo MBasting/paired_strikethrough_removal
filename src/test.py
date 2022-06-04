@@ -167,10 +167,12 @@ def evaluate_folder(folder, data, save, checkpoint, min_time=None):
             # Found folder that contains CycleGAN results
             if len(child.name.split("_")) < 2:
                 for grand_child in child.iterdir():
-                    file = folder.name + "/" + child.name + "/" + grand_child.name + "/config.cfg"
-                    results_files = evaluate_one_file(file, data, save, checkpoint, True)
-                    temp = read_to_dict(results_files, path=folder.name + "/" + child.name + "/" + grand_child.name)
-                    results[grand_child.name] = temp
+
+                    if int(grand_child.name.split("_")[1]) >= min_time:
+                        file = folder.name + "/" + child.name + "/" + grand_child.name + "/config.cfg"
+                        results_files = evaluate_one_file(file, data, save, checkpoint, True)
+                        temp = read_to_dict(results_files, path=folder.name + "/" + child.name + "/" + grand_child.name)
+                        results[grand_child.name] = temp
 
             elif min_time is None or int(child.name.split("_")[-3]) > min_time:
                 file = folder.name + "/" + child.name + "/config.cfg"

@@ -194,14 +194,34 @@ def train_and_evaluate_all_models(folder):
 
     """
 
-    min_time = train_all_models()
-    evaluate_folder(Path(folder), None, False, False, 0)
+    # min_time = train_all_models()
+    evaluate_folder(Path(folder), None, False, False, 1654342084)
 
+
+def train_ablation_gan(output_folder):
+    train_dataset_choice = "IAMsynth_full"
+    valid_dataset_choice = "IAMsynth_full"
+    batchSize = 4
+    init_logger = False
+    for identityLambda in [0, 0.5, 1]:
+        for cleanLambda in [5, 10, 20]:
+            for struckLambda in [5, 10, 20]:
+                conf = getDynamicConfigurationGAN("ORIGINAL", None, output_folder, train_dataset_choice,
+                                                  valid_dataset_choice, True, batchSize,
+                                                  identityLambda, cleanLambda, struckLambda)
+                if not init_logger:
+                    initLoggersGAN(conf)
+                    logger = logging.getLogger("st_removal")
+                    init_logger = True
+
+                logger.info(conf.fileSection)
+                runner = TrainRunnerGAN(conf, True)
+                runner.train()
 
 # Note: To run using IDE, make sure working directory is root folder!
 if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
-    train_and_evaluate_all_models('tmp')
+    train_ablation_gan('exp')
     # initLoggers(conf, 'str_ae', ['reconstructionLoss', 'val'])
     # logging.getLogger("str_ae").info(conf.fileSection)
     # runner = TrainRunner(conf)

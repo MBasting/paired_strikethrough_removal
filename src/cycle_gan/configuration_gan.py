@@ -135,8 +135,9 @@ class ConfigurationGAN:
     Holds the configuration for the current experiment.
     """
 
-    def __init__(self, parsedConfig: SectionProxy, test: bool = False, fileSection: str = "ORIGINAL",
-                 train_dataset=None, test_dataset= None):
+    def __init__(self, parsedConfig: SectionProxy, test: bool = False, output_dir=None, fileSection: str = "ORIGINAL",
+                 train_dataset=None, test_dataset=None, batchSize=None, identityLambda=None, cleanLambda=None,
+                 struckLambda=None):
         self.fileSection = fileSection
         if train_dataset is not None:
             self.train_dataset_choice = train_dataset
@@ -145,13 +146,6 @@ class ConfigurationGAN:
             self.train_dataset_choice = parsedConfig.get('dataset_choice_train')
             self.test_dataset_choice = parsedConfig.get('dataset_choice_test')
 
-        if not test:
-            self.outDir = Path(parsedConfig.get('outdir')) / '{}_{}_{}_{}'.format(fileSection, str(int(time.time())),
-                                                                                  random.randint(0, 100000), self.train_dataset_choice)
-            parsedConfig['outdir'] = str(self.outDir)
-
-        if not test and not self.outDir.exists():
-            self.outDir.mkdir(parents=True, exist_ok=True)
         if torch.cuda.is_available():
             self.device = 'cuda'
         else:
@@ -159,8 +153,7 @@ class ConfigurationGAN:
         self.epochs = parsedConfig.getint('epochs', 100)
         self.learningRate = parsedConfig.getfloat('learning_rate', 0.0002)
         self.betas = self.parseBetas(parsedConfig.get("betas", "0.5,0.999"))
-
-        self.batchSize = parsedConfig.getint('batchsize', 4)
+        self.batchSize = batchSize if batchSize else parsedConfig.getint('batchsize', 4)
         self.imageHeight = parsedConfig.getint('imageheight', 128)
         self.imageWidth = parsedConfig.getint('imagewidth', 256)
         self.modelSaveEpoch = parsedConfig.getint('modelsaveepoch', 10)
@@ -198,12 +191,23 @@ class ConfigurationGAN:
         self.padWidth = parsedConfig.getint('padwidth', 512)
         self.padHeight = parsedConfig.getint('padheight', 128)
         self.cnnLambda = parsedConfig.getfloat('cnn_lambda', 0.5)
-        self.identityLambda = parsedConfig.getfloat('identity_lambda', 0.5)
-        self.cleanLambda = parsedConfig.getfloat('clean_lambda', 10.0)
-        self.struckLambda = parsedConfig.getfloat('struck_lambda', 10.0)
+        self.identityLambda = identityLambda if identityLambda is not None else parsedConfig.getfloat('identity_lambda', 0.5)
+        self.cleanLambda = cleanLambda if cleanLambda is not None else parsedConfig.getfloat('clean_lambda', 10.0)
+        self.struckLambda = struckLambda if struckLambda is not None else parsedConfig.getfloat('struck_lambda', 10.0)
+        print(f"Lambda_{self.identityLambda}_{self.cleanLambda}_{self.struckLambda}")
         self.discWithFeature = parsedConfig.getboolean('disc_feature', False)
         if self.featureType == FeatureType.NONE:
             self.discWithFeature = False
+
+        if not test:
+            output_dir = output_dir if output_dir else parsedConfig.get('outdir')
+            self.outDir = Path(output_dir) / '{}_{}_{}_{}_{}'.format(fileSection, str(int(time.time())),
+                                                                     random.randint(0, 100000),
+                                                                     self.train_dataset_choice, self.batchSize)
+            parsedConfig['outdir'] = str(self.outDir)
+
+        if not test and not self.outDir.exists():
+            self.outDir.mkdir(parents=True, exist_ok=True)
 
         f = parsedConfig.get("fold")
         if f == "all" and self.train_dataset_choice == DatasetChoice.Dracula_synth.name or self.train_dataset_choice == DatasetChoice.Dracula_synth.name:
@@ -278,7 +282,9 @@ class ConfigurationGAN:
         return strokeTypes
 
 
-def getDynamicConfigurationGAN(configSection, configFile, train_dataset=None, test_dataset=None, dynamic=True) -> ConfigurationGAN:
+def getDynamicConfigurationGAN(configSection, configFile, output_dir="tmp", train_dataset=None, test_dataset=None,
+                               dynamic=True, batchSize=None, identityLambda=None, cleanLambda=None,
+                               struckLambda=None) -> ConfigurationGAN:
     fileSection = 'ORIGINAL'
     if dynamic:
         fileName = 'config_files/serverConfig_strike_rem_dyn.cfg'
@@ -296,8 +302,8 @@ def getDynamicConfigurationGAN(configSection, configFile, train_dataset=None, te
         if s != fileSection:
             configParser.remove_section(s)
     if train_dataset is not None and test_dataset is not None:
-        return ConfigurationGAN(parsedConfig, fileSection=fileSection, train_dataset=train_dataset,
-                                test_dataset=test_dataset)
+        return ConfigurationGAN(parsedConfig, False, output_dir, fileSection, train_dataset,
+                                test_dataset, batchSize, identityLambda, cleanLambda, struckLambda)
     else:
         return ConfigurationGAN(parsedConfig, fileSection=fileSection)
 
@@ -314,4 +320,4 @@ def getConfigurationGAN() -> ConfigurationGAN:
     cmdParser.add_argument("-config", required=False, help="section of config-file to use")
     cmdParser.add_argument("-configfile", required=False, help="path to config-file")
     args = vars(cmdParser.parse_args())
-    return getDynamicConfigurationGAN(args["config"], args['configfile'], dynamic=True)
+    return getDynamicConfigurationGAN(args["config"], args['configfile'], dynamic=True, batchSize=8)
