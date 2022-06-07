@@ -180,3 +180,7 @@ fabric.properties
 
 # Dataset
 /datasets/
+runs/
+exp1/
+exp/
+videos/
