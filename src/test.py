@@ -41,7 +41,7 @@ class TestRunner:
         self.saveCleanedImages = saveCleanedImages
 
         transformations = composeTransformations(self.config)
-        testDataset = TestDataset(testImageDir, transformations, strokeTypes=["all"])
+        testDataset = TestDataset(testImageDir, transformations, strokeTypes=["DIAGONAL"])
         self.validationDataloader = DataLoader(testDataset, batch_size=4, shuffle=False, num_workers=2, pin_memory=True)
 
         self.model = getModel(self.config)
@@ -155,6 +155,7 @@ def evaluate_one_file(file, data, save, checkpoint, GAN=False):
             runner = TestRunnerGAN(conf, testImageDir, saveCleanedImages=saveCleanedImages)
             runner.test()
         else:
+            print(testImageDir)
             runner = TestRunner(conf, testImageDir, saveCleanedImages=saveCleanedImages)
             runner.test()
     return results
@@ -174,11 +175,17 @@ def evaluate_folder(folder, data, save, checkpoint, min_time=None):
                         temp = read_to_dict(results_files, path=folder.name + "/" + child.name + "/" + grand_child.name)
                         results[grand_child.name] = temp
 
+            elif "ORIGINAL" in child.name:
+                file = folder.name + "/" + child.name + "/config.cfg"
+                results_files = evaluate_one_file(file, data, save, checkpoint, True)
+                temp = read_to_dict(results_files, path=folder.name + "/" + child.name)
+                results[child.name] = temp
             elif min_time is None or int(child.name.split("_")[-3]) > min_time:
                 file = folder.name + "/" + child.name + "/config.cfg"
                 results_files = evaluate_one_file(file, data, save, checkpoint)
                 temp = read_to_dict(results_files, path=folder.name + "/" + child.name)
                 results[child.name] = temp
+
     with open(f'results_{str(time.time())}.json', 'w') as fp:
         json.dump(results, fp)
 
@@ -230,23 +237,24 @@ def read_log(path_to_res):
 
 if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
+    evaluate_folder(Path("Diagonal/"), "datasets/IAMsynth_full/test", False, False)
 
-    cmdParser = argparse.ArgumentParser()
-    cmdParser.add_argument("-file", required=False, help="path to config file", default=None)
-    cmdParser.add_argument("-folder", required=False, help="path to folder containing the training files", default=None)
-    cmdParser.add_argument("-data", required=False,
-                           help="path to data directory, if no path given all test dataset are run", default=None)
-    cmdParser.add_argument("-save", required=False, help="saves cleaned images if given", default=False,
-                           action='store_true')
-    cmdParser.add_argument("-checkpoint", required=False,
-                           help="checkpoint file name (incl. '.pth' extension) - Default: best_fmeasure.pth",
-                           default="best_fmeasure.pth")
-    args = cmdParser.parse_args()
-    if args.file is None and args.folder is None:
-        print("No file or Folder specified")
-        exit()
-    if args.folder is not None:
-        folder = args.folder
-        evaluate_folder(Path(folder), args.data, args.save, args.checkpoint)
-    else:
-        evaluate_one_file(args.file, args.data, args.save, args.checkpoint)
+    # cmdParser = argparse.ArgumentParser()
+    # cmdParser.add_argument("-file", required=False, help="path to config file", default=None)
+    # cmdParser.add_argument("-folder", required=False, help="path to folder containing the training files", default=None)
+    # cmdParser.add_argument("-data", required=False,
+    #                        help="path to data directory, if no path given all test dataset are run", default=None)
+    # cmdParser.add_argument("-save", required=False, help="saves cleaned images if given", default=False,
+    #                        action='store_true')
+    # cmdParser.add_argument("-checkpoint", required=False,
+    #                        help="checkpoint file name (incl. '.pth' extension) - Default: best_fmeasure.pth",
+    #                        default="best_fmeasure.pth")
+    # args = cmdParser.parse_args()
+    # if args.file is None and args.folder is None:
+    #     print("No file or Folder specified")
+    #     exit()
+    # if args.folder is not None:
+    #     folder = args.folder
+    #     evaluate_folder(Path(folder), args.data, args.save, args.checkpoint)
+    # else:
+    #     evaluate_one_file(args.file, args.data, args.save, args.checkpoint)

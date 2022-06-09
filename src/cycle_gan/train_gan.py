@@ -16,7 +16,9 @@ from torchvision.utils import save_image
 from src import metrics
 from src.cycle_gan import dataset_gan
 from src.dataset import PairedDataset
-from .configuration_gan import ExperimentType, FeatureType, getConfigurationGAN, ConfigurationGAN
+from src.dataset2 import BigPairedDataset
+from .configuration_gan import ExperimentType, FeatureType, getConfigurationGAN, ConfigurationGAN, \
+    getDynamicConfigurationGAN
 from .network import image_pool
 from .network.initialise import init_weights
 from .utils_gan import composeTransformations, getGeneratorModels, getDiscriminatorModels, \
@@ -74,7 +76,7 @@ class TrainRunnerGAN:
     Utility class that wraps the initialisation, training and validation steps of the training run.
     """
 
-    def __init__(self, config: ConfigurationGAN, dynamic=False, binarize=False):
+    def __init__(self, config: ConfigurationGAN, dynamic=False, big=False):
         self.logger = logging.getLogger(INFO_LOGGER_NAME)
         self.ctosLogger = logging.getLogger(C_TO_S_GEN_LOGGER_NAME)
         self.stocLogger = logging.getLogger(S_TO_C_GEN_LOGGER_NAME)
@@ -82,46 +84,36 @@ class TrainRunnerGAN:
         self.sdLogger = logging.getLogger(STRUCK_DISC_LOGGER_NAME)
         self.valLogger = logging.getLogger(VALIDATION_LOGGER_NAME)
 
-        self.binarize = binarize
-
         self.config = config
         self.dynamic = dynamic
         transformations = composeTransformations(self.config)
-
-        if dynamic:
-            trainDataset = PairedDataset(config.trainImageDir, fold=self.config.fold, mode="train",
-                                         transforms=transformations, strokeTypes=self.config.trainStrokeTypes)
-            self.trainDataLoader = DataLoader(trainDataset, batch_size=self.config.batchSize, shuffle=True,
-                                              num_workers=1)
-
-            validationDataset = PairedDataset(config.testImageDir, fold=-1, mode="validation",
+        if big:
+            trainDataset = BigPairedDataset(config.trainImageDir, fold=self.config.fold, mode="train",
+                                             transforms=transformations, strokeTypes=self.config.trainStrokeTypes)
+            validationDataset = BigPairedDataset(config.testImageDir, fold=-1, mode="validation",
                                               transforms=transformations, strokeTypes=self.config.testStrokeTypes)
-            self.validationDataloader = DataLoader(validationDataset, batch_size=self.config.batchSize, shuffle=False,
-                                                   num_workers=1)
         else:
-            trainDataset = dataset_gan.StruckCleanDataset(self.config.trainImageDir, transforms=transformations,
-                                                          strokeTypes=self.config.trainStrokeTypes,
-                                                          count=self.config.count, featureType=self.config.featureType)
-            validationDataset = dataset_gan.ValidationStruckCleanDataset(self.config.testImageDir,
-                                                                         transforms=transformations,
-                                                                         strokeTypes=self.config.testStrokeTypes,
-                                                                         count=self.config.validationCount,
-                                                                         featureType=self.config.featureType)
+            if dynamic:
+                trainDataset = PairedDataset(config.trainImageDir, fold=self.config.fold, mode="train",
+                                             transforms=transformations, strokeTypes=self.config.trainStrokeTypes)
 
-            self.trainDataLoader = DataLoader(trainDataset, batch_size=self.config.batchSize, shuffle=True,
-                                              num_workers=1)
-            self.validationDataloader = DataLoader(validationDataset, batch_size=self.config.batchSize, shuffle=False,
-                                                   num_workers=1)
+                validationDataset = PairedDataset(config.testImageDir, fold=-1, mode="validation",
+                                                  transforms=transformations, strokeTypes=self.config.testStrokeTypes)
 
-        trainDataset = PairedDataset(config.trainImageDir, fold=self.config.fold, mode="train",
-                                     transforms=transformations, strokeTypes=self.config.trainStrokeTypes)
-        self.trainDataLoader = DataLoader(trainDataset, batch_size=self.config.batchSize, shuffle=True, num_workers=1)
+            else:
+                trainDataset = dataset_gan.StruckCleanDataset(self.config.trainImageDir, transforms=transformations,
+                                                              strokeTypes=self.config.trainStrokeTypes,
+                                                              count=self.config.count, featureType=self.config.featureType)
+                validationDataset = dataset_gan.ValidationStruckCleanDataset(self.config.testImageDir,
+                                                                             transforms=transformations,
+                                                                             strokeTypes=self.config.testStrokeTypes,
+                                                                             count=self.config.validationCount,
+                                                                             featureType=self.config.featureType)
 
-        validationDataset = PairedDataset(config.testImageDir, fold=-1, mode="validation",
-                                          transforms=transformations, strokeTypes=self.config.testStrokeTypes)
+        self.trainDataLoader = DataLoader(trainDataset, batch_size=self.config.batchSize, shuffle=True,
+                                          num_workers=4)
         self.validationDataloader = DataLoader(validationDataset, batch_size=self.config.batchSize, shuffle=False,
                                                num_workers=1)
-
         self.logger.info('Experiment: %s', self.config.experiment.name)
         self.logger.info('Data dir: %s', str(self.config.trainImageDir))
         self.logger.info('Train dataset size: %d', len(trainDataset))
@@ -151,8 +143,6 @@ class TrainRunnerGAN:
             lr=self.config.learningRate, betas=self.config.betas)
 
         self.discriminator_criterion = nn.MSELoss()
-        if binarize:
-            self.discriminator_criterion = nn.BCELoss()
         self.image_l1_criterion = nn.L1Loss()
 
         self.fake_clean_pool = image_pool.ImagePool(self.config.poolSize)
@@ -170,7 +160,8 @@ class TrainRunnerGAN:
         self.bestRmseEpoch = 0
         self.bestFscore = float('-inf')
         self.bestFscoreEpoch = 0
-        self.writer = SummaryWriter(log_dir=f"runs/batch_{self.config.batchSize}_IdL_{self.config.identityLambda}_LamStruck_{self.config.struckLambda}_LamClean_{self.config.cleanLambda}_ep_{self.config.epochs}_{str(int(time.time()))}")
+        self.writer = SummaryWriter(
+            log_dir=f"runs/batch_{self.config.batchSize}_IdL_{self.config.identityLambda}_LamStruck_{self.config.struckLambda}_LamClean_{self.config.cleanLambda}_ep_{self.config.epochs}_{str(int(time.time()))}")
 
     def train(self) -> None:
         """
@@ -492,7 +483,6 @@ class TrainRunnerGAN:
 
         cleanDiscrimination = self.cleanDiscriminator(generatedClean)
 
-
         lossStruckDiscriminator = self.discriminator_criterion(struckDiscrimination,
                                                                torch.ones_like(struckDiscrimination).to(
                                                                    self.config.device))
@@ -593,8 +583,8 @@ class TrainRunnerGAN:
         discriminatorLossClean.backward()
 
         self.writer.add_scalars('Losses_per_batch_Discriminator', {
-            'fakeCleanLoss' : fakeCleanLoss,
-            'realCleanLoss' : realCleanLoss
+            'fakeCleanLoss': fakeCleanLoss,
+            'realCleanLoss': realCleanLoss
         }, batchID * epoch)
 
         self.discriminatorOptimiser.step()
@@ -620,9 +610,9 @@ class TrainRunnerGAN:
 
 if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
-    conf = getConfigurationGAN()
+    conf = getDynamicConfigurationGAN("ORIGINAL", None, train_dataset="self_full", test_dataset="self_full")
     initLoggersGAN(conf)
     logger = logging.getLogger(INFO_LOGGER_NAME)
     logger.info(conf.fileSection)
-    runner = TrainRunnerGAN(conf, True)
+    runner = TrainRunnerGAN(conf, True, True)
     runner.train()

@@ -8,24 +8,11 @@ import time
 from configparser import SectionProxy
 from enum import Enum, auto
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import torch
 
-from src.configuration import DatasetChoice
-
-
-class StrikeThroughType(Enum):
-    """
-    Encodes the type of strikethrough
-    """
-    SINGLE_LINE = 0
-    DOUBLE_LINE = 1
-    DIAGONAL = 2
-    CROSS = 3
-    WAVE = 4
-    ZIG_ZAG = 5
-    SCRATCH = 6
+from src.configuration import DatasetChoice, StrikeThroughType
 
 
 class ExperimentType(Enum):
@@ -205,6 +192,7 @@ class ConfigurationGAN:
                                                                      random.randint(0, 100000),
                                                                      self.train_dataset_choice, self.batchSize)
             parsedConfig['outdir'] = str(self.outDir)
+            print(output_dir)
 
         if not test and not self.outDir.exists():
             self.outDir.mkdir(parents=True, exist_ok=True)
@@ -250,7 +238,7 @@ class ConfigurationGAN:
         return float(betas[0]), float(betas[1])
 
     @staticmethod
-    def parseStrokeTypes(strokeString: str) -> List[StrikeThroughType]:
+    def parseStrokeTypes(strokeString: str) -> Union[List[StrikeThroughType], List[str]]:
         """
         Parses a comma-separated string to a list of stroke types.
 
@@ -276,13 +264,13 @@ class ConfigurationGAN:
             for item in splitTypes:
                 item = item.strip()
                 if item in [stroke.name for stroke in StrikeThroughType]:
-                    strokeTypes.append(StrikeThroughType[item])
+                    strokeTypes.append(item)  # StrikeThroughType[item].name)
         if len(strokeTypes) < 1:
             strokeTypes = ["all"]
         return strokeTypes
 
 
-def getDynamicConfigurationGAN(configSection, configFile, output_dir="tmp", train_dataset=None, test_dataset=None,
+def getDynamicConfigurationGAN(configSection, configFile, output_dir=None, train_dataset=None, test_dataset=None,
                                dynamic=True, batchSize=None, identityLambda=None, cleanLambda=None,
                                struckLambda=None) -> ConfigurationGAN:
     fileSection = 'ORIGINAL'
@@ -302,7 +290,7 @@ def getDynamicConfigurationGAN(configSection, configFile, output_dir="tmp", trai
         if s != fileSection:
             configParser.remove_section(s)
     if train_dataset is not None and test_dataset is not None:
-        return ConfigurationGAN(parsedConfig, False, output_dir, fileSection, train_dataset,
+        return ConfigurationGAN(parsedConfig, False, None, fileSection, train_dataset,
                                 test_dataset, batchSize, identityLambda, cleanLambda, struckLambda)
     else:
         return ConfigurationGAN(parsedConfig, fileSection=fileSection)

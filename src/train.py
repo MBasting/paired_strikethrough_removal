@@ -149,34 +149,32 @@ class TrainRunner:
 
 def train_all_models():
     # For any other change in configuration add a loop and change of arguments!
-    training_datasets = [dataset.name for dataset in DatasetChoice]
+    dataset = "IAMsynth_full"
     model_configs = [section.name for section in FileSection]
-    training_datasets.reverse()
     model_configs.append("ORIGINAL")
     min_time = time.time()
 
     for section in model_configs:
-        for dataset in training_datasets:
-            train_dataset_choice = dataset
-            valid_dataset_choice = dataset
-            if valid_dataset_choice is DatasetChoice.Dracula_synth.name:
-                valid_dataset_choice = DatasetChoice.Dracula_real.name
-            if section == "ORIGINAL":
-                conf = getDynamicConfigurationGAN(section, None, train_dataset=train_dataset_choice, test_dataset=valid_dataset_choice)
-                initLoggersGAN(conf)
-                logger = logging.getLogger("st_removal")
-                logger.info(conf.fileSection)
-                runner = TrainRunnerGAN(conf, True)
-                runner.train()
-            else:
-                conf = getConfiguration_dynamic(None, section, train_dataset=train_dataset_choice,
-                                                test_dataset=valid_dataset_choice)
-                initLoggers(conf, 'str_ae', ['reconstructionLoss', 'val'])
-                logging.getLogger("str_ae").info(conf.fileSection)
-                logging.getLogger("str_ae").info(conf.train_dataset_choice)
-                logging.getLogger("str_ae").info(conf.test_dataset_choice)
-                runner = TrainRunner(conf)
-                runner.run()
+        train_dataset_choice = dataset
+        valid_dataset_choice = dataset
+        if valid_dataset_choice is DatasetChoice.Dracula_synth.name:
+            valid_dataset_choice = DatasetChoice.Dracula_real.name
+        if section == "ORIGINAL":
+            conf = getDynamicConfigurationGAN(section, None, train_dataset=train_dataset_choice, test_dataset=valid_dataset_choice)
+            initLoggersGAN(conf)
+            logger = logging.getLogger("st_removal")
+            logger.info(conf.fileSection)
+            runner = TrainRunnerGAN(conf, True)
+            runner.train()
+        else:
+            conf = getConfiguration_dynamic(None, section, train_dataset=train_dataset_choice,
+                                            test_dataset=valid_dataset_choice)
+            initLoggers(conf, 'str_ae', ['reconstructionLoss', 'val'])
+            logging.getLogger("str_ae").info(conf.fileSection)
+            logging.getLogger("str_ae").info(conf.train_dataset_choice)
+            logging.getLogger("str_ae").info(conf.test_dataset_choice)
+            runner = TrainRunner(conf)
+            runner.run()
 
     return min_time
 
@@ -194,34 +192,32 @@ def train_and_evaluate_all_models(folder):
 
     """
 
-    # min_time = train_all_models()
-    evaluate_folder(Path(folder), None, False, False, 1654342084)
+    min_time = train_all_models()
+    evaluate_folder(Path(folder), None, False, False, 0)
 
 
 def train_ablation_gan(output_folder):
     train_dataset_choice = "IAMsynth_full"
     valid_dataset_choice = "IAMsynth_full"
-    batchSize = 4
     init_logger = False
-    for identityLambda in [0, 0.5, 1]:
-        for cleanLambda in [5, 10, 20]:
-            for struckLambda in [5, 10, 20]:
-                conf = getDynamicConfigurationGAN("ORIGINAL", None, output_folder, train_dataset_choice,
-                                                  valid_dataset_choice, True, batchSize,
-                                                  identityLambda, cleanLambda, struckLambda)
-                if not init_logger:
-                    initLoggersGAN(conf)
-                    logger = logging.getLogger("st_removal")
-                    init_logger = True
-
-                logger.info(conf.fileSection)
-                runner = TrainRunnerGAN(conf, True)
-                runner.train()
-
+    batchSize = 2
+    identityLambda = 1
+    for struck_lambda in [10, 15, 20]:
+        conf = getDynamicConfigurationGAN("ORIGINAL", None, output_folder, train_dataset_choice,
+                                          valid_dataset_choice, True, batchSize,
+                                          identityLambda, struckLambda=struck_lambda)
+        if not init_logger:
+            initLoggersGAN(conf)
+            logger = logging.getLogger("st_removal")
+            init_logger = True
+        logger.info(conf.fileSection)
+        runner = TrainRunnerGAN(conf, True)
+        runner.train()
 # Note: To run using IDE, make sure working directory is root folder!
 if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
-    train_ablation_gan('exp')
+    train_all_models()
+    # train_and_evaluate_all_models('exp1')
     # initLoggers(conf, 'str_ae', ['reconstructionLoss', 'val'])
     # logging.getLogger("str_ae").info(conf.fileSection)
     # runner = TrainRunner(conf)

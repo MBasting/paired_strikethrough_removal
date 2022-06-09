@@ -220,7 +220,7 @@ class TestDataset(Dataset):
                 ((self.struckDir / row.image_id).with_suffix(".png"), StrikeThroughType[row.strike_type]) for row in
                 struckDf.iloc]
         else:
-            hasCorrectType = struckDf["strike_type"].isin([stroke.name for stroke in self.strokeTypes])
+            hasCorrectType = struckDf["strike_type"].isin([stroke for stroke in self.strokeTypes])
             selectedRows = struckDf[hasCorrectType]
             self.struckFileNames = [(self.struckDir / row.image_id).with_suffix(".png") for row in selectedRows.iloc]
             self.fileStrokeType = [

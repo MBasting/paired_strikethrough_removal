@@ -34,7 +34,7 @@ class BigPairedDataset(Dataset):
         self.transforms = transforms
         self.fold = fold
         self.struckDir = rootDir / mode / "struck"
-        self.groundTruthDir = rootDir / mode / "struck_gt"
+        self.groundTruthDir = rootDir / "gt"
 
 
 
@@ -47,7 +47,7 @@ class BigPairedDataset(Dataset):
                 foldData.append(data)
             self.data = pd.concat(foldData)
         else:
-            self.data = pd.read_csv(self.struckDir / "struck_{}.csv".format(mode), dtype={"image_id": str})
+            self.data = pd.read_csv(self.struckDir / "{}_struck.csv".format(mode), dtype={"image_id": str})
         if strokeTypes and "all" not in strokeTypes:
             self.data = self.data[self.data["strike_type"].isin(strokeTypes)].reset_index()
 
@@ -76,9 +76,9 @@ class BigPairedDataset(Dataset):
         entry = self.data.iloc[index]
 
         if self.fold == "all":
-            struckImage = Image.open((self.struckDir / entry.fold_image_id).with_suffix(".png"))
+            struckImage = Image.open(self.struckDir / (entry.fold_image_id.removesuffix(".png") + f"_StrokeType/.{entry['strike_type']}.png"))
         else:
-            struckImage = Image.open((self.struckDir / entry.image_id).with_suffix(".png"))
+            struckImage = Image.open(self.struckDir / (entry.image_id.removesuffix(".png") + f"_StrokeType.{entry['strike_type']}.png"))
 
         gtImage = Image.open((self.groundTruthDir / entry.image_id.split("_")[0]).with_suffix(".png"))
 

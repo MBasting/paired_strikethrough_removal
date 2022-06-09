@@ -68,8 +68,8 @@ class TestRunnerGAN:
         self.saveCleanedImages = saveCleanedImages
 
         transformations = composeTransformations(self.config)
-        testDataset = TestDataset(testImageDir, transformations, strokeTypes=self.config.testStrokeTypes)
-        self.validationDataloader = DataLoader(testDataset, batch_size=16, shuffle=False, num_workers=1)
+        testDataset = TestDataset(testImageDir, transformations, strokeTypes=["DIAGONAL"])
+        self.validationDataloader = DataLoader(testDataset, batch_size=4, shuffle=False, num_workers=2, pin_memory=True)
 
         _, self.genStrikeToClean = getGeneratorModels(self.config)
 

@@ -101,6 +101,7 @@ class DatasetChoice(Enum):
     IAMsynth_full = auto()
     Dracula_real = auto()
     Dracula_synth = auto()
+    self_full = auto()
 
     @staticmethod
     def getByName(name: str) -> str:
@@ -163,7 +164,6 @@ class Configuration:
 
         trainTypes = self.getSetStr('train_stroke_types', 'all')
         self.trainStrokeTypes = self.parseStrokeTypes(trainTypes)
-
         testTypes = parsedConfig.get('test_stroke_types', '')
         if not testTypes:
             self.getSetStr("test_stroke_types", parsedConfig.get('train_stroke_types'))
