@@ -111,7 +111,7 @@ class TrainRunnerGAN:
                                                                              featureType=self.config.featureType)
 
         self.trainDataLoader = DataLoader(trainDataset, batch_size=self.config.batchSize, shuffle=True,
-                                          num_workers=1)
+                                          num_workers=0)
         self.validationDataloader = DataLoader(validationDataset, batch_size=self.config.batchSize, shuffle=False,
                                                num_workers=1)
         self.logger.info('Experiment: %s', self.config.experiment.name)
