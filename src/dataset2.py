@@ -76,9 +76,9 @@ class BigPairedDataset(Dataset):
         entry = self.data.iloc[index]
 
         if self.fold == "all":
-            struckImage = Image.open(self.struckDir / (entry.fold_image_id.removesuffix(".png") + f"_StrokeType/.{entry['strike_type']}.png"))
+            struckImage = Image.open(self.struckDir / (entry.fold_image_id[:-4] + f"_StrokeType/.{entry['strike_type']}.png"))
         else:
-            struckImage = Image.open(self.struckDir / (entry.image_id.removesuffix(".png") + f"_StrokeType.{entry['strike_type']}.png"))
+            struckImage = Image.open(self.struckDir / (entry.image_id[:-4] + f"_StrokeType.{entry['strike_type']}.png"))
 
         gtImage = Image.open((self.groundTruthDir / entry.image_id.split("_")[0]).with_suffix(".png"))
 
