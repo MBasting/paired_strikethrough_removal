@@ -153,7 +153,7 @@ generator.summary()
 optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
 
 
-def generate_images(model, test_input, tar):
+def generate_images(model, zoom, tar):
     prediction = model(test_input, training=True)
     plt.figure(figsize=(15, 15))
 
