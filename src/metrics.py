@@ -116,6 +116,7 @@ def calculateF1Score(actual: np.ndarray, predicted: np.ndarray, binarise: bool =
         fmeasure = []
         detection_rate = []
         recognition_accuracy = []
+
         for idx in range(actual.shape[0]):
             a = actual[idx].reshape(actual.shape[2], actual.shape[3]).astype(np.uint8)
             p = predicted[idx].reshape(predicted.shape[2], predicted.shape[3]).astype(np.uint8)
