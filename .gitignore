@@ -185,9 +185,9 @@ videos/
 
 
 exp/
-
-runs/
-
 exp1/
-
+runs/
 Diagonal/
+/all/
+
+*.h5

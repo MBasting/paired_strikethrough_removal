@@ -290,10 +290,10 @@ def getDynamicConfigurationGAN(configSection, configFile, output_dir=None, train
         if s != fileSection:
             configParser.remove_section(s)
     if train_dataset is not None and test_dataset is not None:
-        return ConfigurationGAN(parsedConfig, False, None, fileSection, train_dataset,
+        return ConfigurationGAN(parsedConfig, False, output_dir, fileSection, train_dataset,
                                 test_dataset, batchSize, identityLambda, cleanLambda, struckLambda)
     else:
-        return ConfigurationGAN(parsedConfig, fileSection=fileSection)
+        return ConfigurationGAN(parsedConfig, output_dir=output_dir,fileSection=fileSection)
 
 
 def getConfigurationGAN() -> ConfigurationGAN:

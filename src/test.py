@@ -237,24 +237,23 @@ def read_log(path_to_res):
 
 if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
-    evaluate_folder(Path("Diagonal/"), "datasets/IAMsynth_full/test", False, False)
 
-    # cmdParser = argparse.ArgumentParser()
-    # cmdParser.add_argument("-file", required=False, help="path to config file", default=None)
-    # cmdParser.add_argument("-folder", required=False, help="path to folder containing the training files", default=None)
-    # cmdParser.add_argument("-data", required=False,
-    #                        help="path to data directory, if no path given all test dataset are run", default=None)
-    # cmdParser.add_argument("-save", required=False, help="saves cleaned images if given", default=False,
-    #                        action='store_true')
-    # cmdParser.add_argument("-checkpoint", required=False,
-    #                        help="checkpoint file name (incl. '.pth' extension) - Default: best_fmeasure.pth",
-    #                        default="best_fmeasure.pth")
-    # args = cmdParser.parse_args()
-    # if args.file is None and args.folder is None:
-    #     print("No file or Folder specified")
-    #     exit()
-    # if args.folder is not None:
-    #     folder = args.folder
-    #     evaluate_folder(Path(folder), args.data, args.save, args.checkpoint)
-    # else:
-    #     evaluate_one_file(args.file, args.data, args.save, args.checkpoint)
+    cmdParser = argparse.ArgumentParser()
+    cmdParser.add_argument("-file", required=False, help="path to config file", default=None)
+    cmdParser.add_argument("-folder", required=False, help="path to folder containing the training files", default=None)
+    cmdParser.add_argument("-data", required=False,
+                           help="path to data directory, if no path given all test dataset are run", default=None)
+    cmdParser.add_argument("-save", required=False, help="saves cleaned images if given", default=False,
+                           action='store_true')
+    cmdParser.add_argument("-checkpoint", required=False,
+                           help="checkpoint file name (incl. '.pth' extension) - Default: best_fmeasure.pth",
+                           default="best_fmeasure.pth")
+    args = cmdParser.parse_args()
+    if args.file is None and args.folder is None:
+        print("No file or Folder specified")
+        exit()
+    elif args.folder is not None:
+        folder = args.folder
+        evaluate_folder(Path(folder), args.data, args.save, args.checkpoint)
+    else:
+        evaluate_one_file(args.file, args.data, args.save, args.checkpoint)

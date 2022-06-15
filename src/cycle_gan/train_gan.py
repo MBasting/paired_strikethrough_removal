@@ -610,7 +610,7 @@ class TrainRunnerGAN:
 
 if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
-    conf = getDynamicConfigurationGAN("ORIGINAL", None, train_dataset="self_full", test_dataset="self_full")
+    conf = getConfigurationGAN()
     initLoggersGAN(conf)
     logger = logging.getLogger(INFO_LOGGER_NAME)
     logger.info(conf.fileSection)

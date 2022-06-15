@@ -4,6 +4,8 @@ from pathlib import Path
 
 import warnings
 
+from src.dataset2 import BigPairedDataset
+
 warnings.simplefilter("ignore", UserWarning)
 
 import numpy as np
@@ -12,7 +14,7 @@ from torch.utils.data import DataLoader
 from torchvision.utils import save_image
 
 from src import configuration, metrics
-from src.configuration import ModelName, DatasetChoice, FileSection, getConfiguration_dynamic
+from src.configuration import ModelName, DatasetChoice, FileSection, getConfiguration_dynamic, getConfiguration
 from src.dataset import PairedDataset
 from src.utils import initLoggers, composeTransformations, PadToSize, getModel
 from src.test import evaluate_folder
@@ -22,7 +24,7 @@ from src.cycle_gan.train_gan import TrainRunnerGAN, initLoggersGAN
 
 class TrainRunner:
 
-    def __init__(self, config: configuration.Configuration):
+    def __init__(self, config: configuration.Configuration, big=False):
         self.baseLogger = logging.getLogger('str_ae')
         self.validationLogger = logging.getLogger('val')
         self.lossLogger = logging.getLogger('reconstructionLoss')
@@ -39,13 +41,19 @@ class TrainRunner:
             self.criterion = torch.nn.BCELoss()
         self.optimiser = torch.optim.Adam(self.model.parameters(), lr=self.config.learningRate, betas=self.config.betas)
         self.transformations = composeTransformations(config)
-        trainDataset = PairedDataset(config.trainImageDir, fold=self.config.fold, mode="train",
-                                     transforms=self.transformations, strokeTypes=self.config.trainStrokeTypes)
-        self.trainDataloader = DataLoader(trainDataset, batch_size=self.config.batchSize, shuffle=True, num_workers=1)
-        testDataset = PairedDataset(config.testImageDir, fold=-1, mode="validation",
-                                    transforms=self.transformations, strokeTypes=self.config.testStrokeTypes)
-        self.testDataloader = DataLoader(testDataset, batch_size=self.config.batchSize, shuffle=False, num_workers=1)
+        if big:
+            trainDataset = BigPairedDataset(config.trainImageDir, fold=self.config.fold, mode="train",
+                                            transforms=self.transformations, strokeTypes=self.config.trainStrokeTypes)
+            testDataset = BigPairedDataset(config.testImageDir, fold=-1, mode="validation",
+                                                 transforms=self.transformations, strokeTypes=self.config.testStrokeTypes)
+        else:
+            trainDataset = PairedDataset(config.trainImageDir, fold=self.config.fold, mode="train",
+                                         transforms=self.transformations, strokeTypes=self.config.trainStrokeTypes)
+            testDataset = PairedDataset(config.testImageDir, fold=-1, mode="validation",
+                                        transforms=self.transformations, strokeTypes=self.config.testStrokeTypes)
+        self.trainDataloader = DataLoader(trainDataset, batch_size=self.config.batchSize, shuffle=True, num_workers=4)
 
+        self.testDataloader = DataLoader(testDataset, batch_size=self.config.batchSize, shuffle=False, num_workers=1)
         self.bestRmse = float('inf')
         self.bestRmseEpoch = 0
         self.bestFscore = float('-inf')
@@ -149,7 +157,7 @@ class TrainRunner:
 
 def train_all_models():
     # For any other change in configuration add a loop and change of arguments!
-    dataset = "IAMsynth_full"
+    dataset = [d_set.name for d_set in DatasetChoice]
     model_configs = [section.name for section in FileSection]
     model_configs.append("ORIGINAL")
     min_time = time.time()
@@ -164,7 +172,7 @@ def train_all_models():
             initLoggersGAN(conf)
             logger = logging.getLogger("st_removal")
             logger.info(conf.fileSection)
-            runner = TrainRunnerGAN(conf, True)
+            runner = TrainRunnerGAN(conf, True, True if train_dataset_choice == DatasetChoice.IAMsynth_all.name else False)
             runner.train()
         else:
             conf = getConfiguration_dynamic(None, section, train_dataset=train_dataset_choice,
@@ -173,7 +181,7 @@ def train_all_models():
             logging.getLogger("str_ae").info(conf.fileSection)
             logging.getLogger("str_ae").info(conf.train_dataset_choice)
             logging.getLogger("str_ae").info(conf.test_dataset_choice)
-            runner = TrainRunner(conf)
+            runner = TrainRunner(conf, True if train_dataset_choice == DatasetChoice.IAMsynth_all.name else False)
             runner.run()
 
     return min_time
@@ -193,12 +201,12 @@ def train_and_evaluate_all_models(folder):
     """
 
     min_time = train_all_models()
-    evaluate_folder(Path(folder), None, False, False, 0)
+    evaluate_folder(Path(folder), None, False, False, min_time)
 
 
 def train_ablation_gan(output_folder):
-    train_dataset_choice = "IAMsynth_full"
-    valid_dataset_choice = "IAMsynth_full"
+    train_dataset_choice = "IAMsynth_all"
+    valid_dataset_choice = "IAMsynth_all"
     init_logger = False
     batchSize = 2
     identityLambda = 1
@@ -216,9 +224,6 @@ def train_ablation_gan(output_folder):
 # Note: To run using IDE, make sure working directory is root folder!
 if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
-    train_all_models()
-    # train_and_evaluate_all_models('exp1')
-    # initLoggers(conf, 'str_ae', ['reconstructionLoss', 'val'])
-    # logging.getLogger("str_ae").info(conf.fileSection)
-    # runner = TrainRunner(conf)
-    # runner.run()
+
+    getConfiguration()
+

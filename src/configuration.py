@@ -101,7 +101,7 @@ class DatasetChoice(Enum):
     IAMsynth_full = auto()
     Dracula_real = auto()
     Dracula_synth = auto()
-    self_full = auto()
+    IAMsynth_all = auto()
 
     @staticmethod
     def getByName(name: str) -> str:
@@ -123,8 +123,8 @@ class Configuration:
             self.train_dataset_choice = self.SetStr('dataset_choice_train', train_dataset)
             self.test_dataset_choice = self.SetStr('dataset_choice_test', test_dataset)
         else:
-            self.train_dataset_choice = self.getSetStr('dataset_choice_train', "IAMsynth_full")
-            self.test_dataset_choice = self.getSetStr('dataset_choice_test', "IAMsynth_full")
+            self.train_dataset_choice = self.getSetStr('dataset_choice_train', "IAMsynth_all")
+            self.test_dataset_choice = self.getSetStr('dataset_choice_test', "IAMsynth_all")
 
         if not test:
             self.outDir = Path(self.parsedConfig.get('out_dir')) / '{}_{}_{}_{}_{}'.format(
